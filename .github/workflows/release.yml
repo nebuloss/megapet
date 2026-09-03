@@ -75,12 +75,20 @@ jobs:
           fi
 
       # Uses the pre-installed gh CLI rather than a third-party action, so the
-      # release step pulls in no code beyond what GitHub already ships.
+      # step that holds a write token pulls in no code beyond what GitHub
+      # already ships.
+      #
+      # Create-or-update rather than create: re-running a release build — after
+      # a force-pushed tag, or a manual dispatch — should refresh the assets,
+      # not fail because the release already exists.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          args="--title ${{ steps.version.outputs.tag }}"
+          tag="${{ steps.version.outputs.tag }}"
+          assets="dist/megapet_*.tar.gz dist/megapet_*.zip dist/megapet_*_checksums.txt"
+
+          args="--title $tag"
           if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
             args="$args --prerelease"
           fi
@@ -89,6 +97,12 @@ jobs:
           else
             args="$args --generate-notes"
           fi
+
           # shellcheck disable=SC2086
-          gh release create "${{ steps.version.outputs.tag }}" $args \
-            dist/megapet_*.tar.gz dist/megapet_*.zip dist/megapet_*_checksums.txt
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release $tag exists; refreshing it"
+            gh release edit "$tag" $args
+            gh release upload "$tag" $assets --clobber
+          else
+            gh release create "$tag" $args $assets
+          fi
