@@ -51,6 +51,8 @@ export class DialVisual implements SpeedVisual {
   private readonly phaseEl: HTMLElement;
 
   private shown = 0;
+  /** Needle position, 0..1. Eased here rather than in Mbps — see `toFraction`. */
+  private shownFraction = 0;
   private target = 0;
   private frame = 0;
   private unit = 'Mbps';
@@ -135,6 +137,7 @@ export class DialVisual implements SpeedVisual {
   reset(): void {
     this.target = 0;
     this.shown = 0;
+    this.shownFraction = 0;
     this.reading = null;
     this.setProgress(0);
     this.paint();
@@ -173,14 +176,19 @@ export class DialVisual implements SpeedVisual {
     if (this.frame) return;
     const step = (): void => {
       // Exponential ease: quick to catch a big jump, calm near the target.
-      const delta = this.target - this.shown;
-      if (Math.abs(delta) < 0.01) {
+      // The arc follows the eased fraction, not the eased Mbps: the scale is
+      // logarithmic, so easing the value would sweep the arc in one frame.
+      const aim = toFraction(this.target);
+      const delta = aim - this.shownFraction;
+      if (Math.abs(delta) < 0.001) {
         this.shown = this.target;
+        this.shownFraction = aim;
         this.paint();
         this.frame = 0;
         return;
       }
-      this.shown += delta * 0.22;
+      this.shown += (this.target - this.shown) * 0.22;
+      this.shownFraction += delta * 0.22;
       this.paint();
       this.frame = requestAnimationFrame(step);
     };
@@ -191,7 +199,7 @@ export class DialVisual implements SpeedVisual {
     this.numberEl.textContent = readoutText(this.reading ?? this.shown, this.unit);
     this.valueArc.setAttribute(
       'stroke-dashoffset',
-      String(ARC_LENGTH * (1 - toFraction(this.shown))),
+      String(ARC_LENGTH * (1 - this.shownFraction)),
     );
   }
 }

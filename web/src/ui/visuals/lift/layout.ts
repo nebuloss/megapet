@@ -127,3 +127,6 @@ export const STAGE = {
 } as const;
 
 export const EASE_TAU = 110;
+
+/** How long the machine takes to return the car to the top floor before a run. */
+export const HOME_MS = 900;

@@ -18,7 +18,14 @@ export const TICKS: ReadonlyArray<readonly [value: number, label: string]> = [
   [10000, '10k'],
 ];
 
-/** Maps Mbps to 0..1 along the scale. */
+/**
+ * Maps Mbps to 0..1 along the scale.
+ *
+ * Note for anything that animates: ease the **fraction**, never the Mbps. This
+ * map is logarithmic, so easing the value and converting per frame makes the
+ * needle leap — a first frame that eases 0 to 127 Mbps of a 940 target moves
+ * the needle across 53% of the dial, and drags anything geared to it along.
+ */
 export function toFraction(mbps: number): number {
   if (!Number.isFinite(mbps) || mbps <= 0) return 0;
   return Math.min(1, Math.log10(1 + mbps) / LOG_MAX);

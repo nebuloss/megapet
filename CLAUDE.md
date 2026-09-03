@@ -47,7 +47,13 @@ them back here before syncing again or the change is lost.
   dial. Both satisfy `SpeedVisual`.
 - The car's position is **carried state**, never computed from the reading. A
   formula like `anchor + sign * fraction * travel` teleports the car the moment
-  `sign` flips, because the eased reading has not caught up yet.
+  `sign` flips, because the eased reading has not caught up yet. The rule lives
+  in `web/src/ui/visuals/lift/carriage.ts` as a pure function, and
+  `carriage.test.ts` simulates whole runs and fails if any single frame moves
+  the car further than the needle's easing allows.
+- The dial scale is **logarithmic**, so animate the fraction, never the Mbps.
+  Easing the value and converting per frame swept the needle across half the
+  dial in the first frame of every phase.
 - `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.
   Stylesheets must only ever read those tokens, never hard-code a colour.
 

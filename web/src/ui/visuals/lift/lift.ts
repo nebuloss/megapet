@@ -20,10 +20,10 @@ import {
   ARC_LENGTH,
   BRAKE,
   CAR,
-  CAR_BOTTOM,
   DRIVE,
   DRIVEN,
   EASE_TAU,
+  HOME_MS,
   FORK,
   HUB,
   LAY,
@@ -44,9 +44,9 @@ import {
   STAGE,
   START_ANGLE,
   SWEEP,
-  TRAVEL,
   WEIGHT,
 } from './layout';
+import { carriageTop } from './carriage';
 import { liftMarkup } from './markup';
 import { armTransform } from './nookie';
 const ACCENTS: Record<GaugeAccent, string> = {
@@ -108,8 +108,22 @@ export class LiftVisual implements SpeedVisual {
    * makes reversing safe: the direction of travel can change without the car
    * being asked to jump to wherever a new formula would put it.
    */
+  /** Needle position, 0..1. Eased here rather than in Mbps — see `toFraction`. */
+  private shownFraction = 0;
+
   private carTop = CAR.top;
   private driveSign = -1;
+
+  /**
+   * Progress of the return to the top floor before a run, 0..1; 1 when idle.
+   *
+   * Resetting used to assign carTop and shown directly, which teleported the
+   * car and snapped the needle the moment Start was pressed on a second run.
+   * The machine drives it home instead, and integration is suspended while it
+   * does — the same reason the brake suspends it during a belt shift.
+   */
+  private homeT = 1;
+  private homeFrom = CAR.top;
 
   private shiftT = 1;
   private cross = CROSS_FOR.up;
@@ -185,6 +199,7 @@ export class LiftVisual implements SpeedVisual {
     this.target = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
     if (this.reducedMotion.matches) {
       this.shown = this.target;
+    this.shownFraction = toFraction(this.target);
       this.paint();
       return;
     }
@@ -231,14 +246,24 @@ export class LiftVisual implements SpeedVisual {
 
   reset(): void {
     this.target = 0;
-    this.shown = 0;
-    this.lastFraction = 0;
     this.reading = null;
-    this.carTop = CAR.top;
     this.driveSign = -1;
     this.root.dataset.drive = 'up';
     this.seat(CROSS_FOR.up, LEVER.seatUp);
     this.setProgress(0);
+
+    if (this.reducedMotion.matches) {
+      this.shown = 0;
+      this.shownFraction = 0;
+      this.lastFraction = 0;
+      this.carTop = CAR.top;
+      this.homeT = 1;
+    } else {
+      // The reading eases to zero on its own; the car is driven home over the
+      // same window, so neither of them jumps.
+      this.homeFrom = this.carTop;
+      this.homeT = 0;
+    }
     this.startLoop();
     this.paint();
   }
@@ -282,15 +307,22 @@ export class LiftVisual implements SpeedVisual {
       const dt = this.lastFrameAt ? Math.min(64, now - this.lastFrameAt) : 16;
       this.lastFrameAt = now;
 
-      const before = this.shown;
+      const aim = toFraction(this.target);
+      const before = this.shownFraction;
       this.shown = approach(this.shown, this.target, dt, EASE_TAU);
+      this.shownFraction = approach(this.shownFraction, aim, dt, EASE_TAU);
       if (this.shiftT < 1) {
         this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);
         if (this.shiftT === 1) this.root.dataset.shifting = 'false';
       }
+      if (this.homeT < 1) this.homeT = Math.min(1, this.homeT + dt / HOME_MS);
 
-      const settled = Math.abs(this.target - before) < 0.005 && this.shiftT === 1;
-      if (settled) this.shown = this.target;
+      const settled =
+        Math.abs(aim - before) < 0.0005 && this.shiftT === 1 && this.homeT === 1;
+      if (settled) {
+        this.shown = this.target;
+        this.shownFraction = aim;
+      }
       this.paint();
 
       if (settled) {
@@ -345,7 +377,7 @@ export class LiftVisual implements SpeedVisual {
   }
 
   private paint(): void {
-    const fraction = toFraction(this.shown);
+    const fraction = this.shownFraction;
     const shift = this.shiftT;
     const shifting = shift < 1;
 
@@ -361,14 +393,16 @@ export class LiftVisual implements SpeedVisual {
       1,
     );
 
-    // --- the car: carried, and held by the brake while the belt is shifted ---
-    if (!shifting) {
-      this.carTop = clamp(
-        this.carTop + this.driveSign * (fraction - this.lastFraction) * TRAVEL,
-        CAR.top,
-        CAR_BOTTOM,
-      );
-    }
+    // --- the car: carried, homed before a run, held during a belt shift ---
+    this.carTop = carriageTop({
+      top: this.carTop,
+      fraction,
+      lastFraction: this.lastFraction,
+      driveSign: this.driveSign,
+      held: shifting,
+      homing: this.homeT,
+      homeFrom: this.homeFrom,
+    });
     this.lastFraction = fraction;
     const carTop = this.carTop;
 
