@@ -130,3 +130,13 @@ export const EASE_TAU = 110;
 
 /** How long the machine takes to return the car to the top floor before a run. */
 export const HOME_MS = 900;
+
+/**
+ * How long the car takes to finish its run into a floor when a phase ends.
+ *
+ * The car's height tracks the reading, so a 940 Mbps result on a scale that
+ * goes to ten gigabits leaves it stopped three quarters of the way down. That
+ * reads as an abandoned journey. When the phase ends the machine drives it the
+ * rest of the way and levels it into the floor it was heading for.
+ */
+export const LAND_MS = 700;

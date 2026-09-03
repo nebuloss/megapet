@@ -50,7 +50,10 @@ them back here before syncing again or the change is lost.
   `sign` flips, because the eased reading has not caught up yet. The rule lives
   in `web/src/ui/visuals/lift/carriage.ts` as a pure function, and
   `carriage.test.ts` simulates whole runs and fails if any single frame moves
-  the car further than the needle's easing allows.
+  the car further than the needle's easing allows. The machine takes the car
+  over in two places — home to the top before a run, and into a floor when a
+  leg ends — and the belt has no say while it does. A reversal queues behind
+  the landing, so `transitionMs` covers `LAND_MS + SHIFT_MS`.
 - The dial scale is **logarithmic**, so animate the fraction, never the Mbps.
   Easing the value and converting per frame swept the needle across half the
   dial in the first frame of every phase.

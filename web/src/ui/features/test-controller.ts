@@ -123,6 +123,8 @@ export class TestController {
       return;
     }
 
+    // Nothing reverses after the upload, so the last leg is landed here.
+    visual.land();
     visual.setPhase('Complete', 'check');
     this.deps.announce(
       `Test complete. Download ${formatSpeed(snapshot.downloadMbps)} megabits per second, ` +
@@ -133,6 +135,9 @@ export class TestController {
 
   private applyPhase(snapshot: Snapshot, visual: SpeedVisual): void {
     if (snapshot.phase === 'reversing') {
+      // The leg that just ended finishes properly first: the car runs into its
+      // floor, and only then is the drive reversed for the next one.
+      visual.land();
       // Selected before the reading is applied, so the shift re-anchors on
       // where the car actually is rather than moving it.
       visual.setDrive(snapshot.nextPhase === 'download' ? 'down' : 'up');

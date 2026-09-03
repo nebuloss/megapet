@@ -21,22 +21,28 @@ export interface CarriageInput {
   readonly driveSign: number;
   /** Brake on: the belt is mid-shift, so needle movement drives nothing. */
   readonly held: boolean;
-  /** Return-to-top-floor progress, 0..1; 1 when not homing. */
-  readonly homing: number;
-  /** Where the car was when homing began. */
-  readonly homeFrom: number;
+  /**
+   * Progress of a scripted move, 0..1; 1 when none is running. The machine
+   * drives the car itself in two places — home to the top floor before a run,
+   * and into a floor when a phase ends — and the belt has no say while it does.
+   */
+  readonly glide: number;
+  /** Where the car was when the scripted move began. */
+  readonly glideFrom: number;
+  /** Where the scripted move is taking it. */
+  readonly glideTo: number;
 }
 
 /**
  * The car's next position.
  *
- * Three cases, in priority order: the machine is driving it home before a run;
- * the brake holds it while the belt is being crossed; otherwise the belt
- * carries it by however far the needle just moved.
+ * Three cases, in priority order: the machine is driving the car itself, home
+ * or into a floor; the brake holds it while the belt is being crossed;
+ * otherwise the belt carries it by however far the needle just moved.
  */
 export function carriageTop(input: CarriageInput): number {
-  if (input.homing < 1) {
-    return lerp(input.homeFrom, CAR.top, easeInOut(input.homing));
+  if (input.glide < 1) {
+    return lerp(input.glideFrom, input.glideTo, easeInOut(input.glide));
   }
   if (input.held) {
     return input.top;

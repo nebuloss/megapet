@@ -118,6 +118,9 @@ export class DialVisual implements SpeedVisual {
     this.root.append(svg, readout);
   }
 
+  /** Nothing travels on a plain dial, so there is nothing to bring to a stop. */
+  land(): void {}
+
   setPosition(mbps: number): void {
     this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     this.startAnimation();

@@ -20,10 +20,12 @@ import {
   ARC_LENGTH,
   BRAKE,
   CAR,
+  CAR_BOTTOM,
   DRIVE,
   DRIVEN,
   EASE_TAU,
   HOME_MS,
+  LAND_MS,
   FORK,
   HUB,
   LAY,
@@ -71,7 +73,7 @@ let instanceCount = 0;
 export class LiftVisual implements SpeedVisual {
   readonly root: HTMLElement;
 
-  readonly transitionMs = SHIFT_MS + 250;
+  readonly transitionMs = LAND_MS + SHIFT_MS + 250;
 
   private readonly svg: SVGSVGElement;
   private readonly nodes: {
@@ -123,10 +125,16 @@ export class LiftVisual implements SpeedVisual {
    * Resetting used to assign carTop and shown directly, which teleported the
    * car and snapped the needle the moment Start was pressed on a second run.
    * The machine drives it home instead, and integration is suspended while it
-   * does — the same reason the brake suspends it during a belt shift.
+   * does — the same reason the brake suspends it during a belt shift. Landing
+   * at the end of a phase uses the same mechanism with a different floor.
    */
-  private homeT = 1;
-  private homeFrom = CAR.top;
+  private glideT = 1;
+  private glideFrom = CAR.top;
+  private glideTo = CAR.top;
+  private glideMs = HOME_MS;
+
+  /** A direction change waiting for the car to stop before the gear is shifted. */
+  private pendingDrive: Drive | null = null;
 
   private shiftT = 1;
   private cross = CROSS_FOR.up;
@@ -224,17 +232,51 @@ export class LiftVisual implements SpeedVisual {
     this.driveSign = sign;
     this.root.dataset.drive = direction;
 
-    const crossTo = CROSS_FOR[direction];
-    const leverTo = direction === 'down' ? LEVER.seatDown : LEVER.seatUp;
     if (this.reducedMotion.matches) {
-      this.seat(crossTo, leverTo);
+      this.seat(CROSS_FOR[direction], direction === 'down' ? LEVER.seatDown : LEVER.seatUp);
       this.paint();
       return;
     }
+    // The reversing gear cannot be shifted while the car is still running.
+    // If it is finishing its run into a floor, the shift queues behind it.
+    if (this.glideT < 1) {
+      this.pendingDrive = direction;
+      this.startLoop();
+      return;
+    }
+    this.beginShift(direction);
+  }
+
+  /**
+   * Brings the car's run to a proper end: the machine drives it the rest of
+   * the way into whichever floor it was heading for and levels it there.
+   */
+  land(): void {
+    const floor = this.driveSign > 0 ? CAR_BOTTOM : CAR.top;
+    if (this.reducedMotion.matches) {
+      this.carTop = floor;
+      this.paint();
+      return;
+    }
+    this.startGlide(floor, LAND_MS);
+  }
+
+  /** Hands the car to the machine for a scripted move; the belt has no say. */
+  private startGlide(to: number, ms: number): void {
+    this.glideFrom = this.carTop;
+    this.glideTo = to;
+    this.glideMs = ms;
+    // Already there: skip it, or a zero-length move would hold up a shift.
+    this.glideT = Math.abs(to - this.carTop) < 0.5 ? 1 : 0;
+    this.startLoop();
+  }
+
+  private beginShift(direction: Drive): void {
+    this.pendingDrive = null;
     this.crossFrom = this.cross;
-    this.crossTo = crossTo;
+    this.crossTo = CROSS_FOR[direction];
     this.leverFrom = this.leverAngle;
-    this.leverTo = leverTo;
+    this.leverTo = direction === 'down' ? LEVER.seatDown : LEVER.seatUp;
     this.shiftT = 0;
     this.root.dataset.shifting = 'true';
     this.startLoop();
@@ -260,13 +302,16 @@ export class LiftVisual implements SpeedVisual {
       this.shownFraction = 0;
       this.lastFraction = 0;
       this.carTop = CAR.top;
-      this.homeT = 1;
+      this.glideT = 1;
     } else {
       // The reading eases to zero on its own; the car is driven home over the
       // same window, so neither of them jumps.
-      this.homeFrom = this.carTop;
-      this.homeT = 0;
+      this.startGlide(CAR.top, HOME_MS);
+      this.glideT = 0; // home even if it is already there, so the run opens level
     }
+    this.pendingDrive = null;
+    this.shiftT = 1;
+    this.root.dataset.shifting = 'false';
     this.startLoop();
     this.paint();
   }
@@ -324,10 +369,16 @@ export class LiftVisual implements SpeedVisual {
         this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);
         if (this.shiftT === 1) this.root.dataset.shifting = 'false';
       }
-      if (this.homeT < 1) this.homeT = Math.min(1, this.homeT + dt / HOME_MS);
+      if (this.glideT < 1) {
+        this.glideT = Math.min(1, this.glideT + dt / this.glideMs);
+        if (this.glideT === 1 && this.pendingDrive) this.beginShift(this.pendingDrive);
+      }
 
       const settled =
-        Math.abs(aim - before) < 0.0005 && this.shiftT === 1 && this.homeT === 1;
+        Math.abs(aim - before) < 0.0005 &&
+        this.shiftT === 1 &&
+        this.glideT === 1 &&
+        !this.pendingDrive;
       if (settled) {
         this.shown = this.target;
         this.shownFraction = aim;
@@ -409,8 +460,9 @@ export class LiftVisual implements SpeedVisual {
       lastFraction: this.lastFraction,
       driveSign: this.driveSign,
       held: shifting,
-      homing: this.homeT,
-      homeFrom: this.homeFrom,
+      glide: this.glideT,
+      glideFrom: this.glideFrom,
+      glideTo: this.glideTo,
     });
     this.lastFraction = fraction;
     const carTop = this.carTop;

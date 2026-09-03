@@ -33,6 +33,12 @@ export interface SpeedVisual extends View {
    * changing direction never teleports it.
    */
   setDrive(direction: Drive): void;
+  /**
+   * Ends the current leg of travel. The lift finishes its run into the floor
+   * it was heading for rather than stopping wherever the reading left it, so
+   * a download arrives at the bottom and an upload at the top.
+   */
+  land(): void;
   /** Returns to the resting state before a new run. */
   reset(): void;
   /** 0..1 elapsed fraction of the current phase. */
