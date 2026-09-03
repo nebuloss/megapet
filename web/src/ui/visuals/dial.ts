@@ -53,6 +53,9 @@ export class DialVisual implements SpeedVisual {
   private shown = 0;
   /** Needle position, 0..1. Eased here rather than in Mbps — see `toFraction`. */
   private shownFraction = 0;
+  /** Where the arc is heading, 0..1. Converted when the target is set, so the
+   *  frame loop stays free of transcendental maths. */
+  private aimFraction = 0;
   private target = 0;
   private frame = 0;
   private unit = 'Mbps';
@@ -116,7 +119,7 @@ export class DialVisual implements SpeedVisual {
   }
 
   setPosition(mbps: number): void {
-    this.target = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
+    this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     this.startAnimation();
   }
 
@@ -135,7 +138,7 @@ export class DialVisual implements SpeedVisual {
   }
 
   reset(): void {
-    this.target = 0;
+    this.aim(0);
     this.shown = 0;
     this.shownFraction = 0;
     this.reading = null;
@@ -172,13 +175,19 @@ export class DialVisual implements SpeedVisual {
     this.frame = 0;
   }
 
+  /** Sets the target and its scale position together; they must never drift. */
+  private aim(mbps: number): void {
+    this.target = mbps;
+    this.aimFraction = toFraction(mbps);
+  }
+
   private startAnimation(): void {
     if (this.frame) return;
     const step = (): void => {
       // Exponential ease: quick to catch a big jump, calm near the target.
       // The arc follows the eased fraction, not the eased Mbps: the scale is
       // logarithmic, so easing the value would sweep the arc in one frame.
-      const aim = toFraction(this.target);
+      const aim = this.aimFraction;
       const delta = aim - this.shownFraction;
       if (Math.abs(delta) < 0.001) {
         this.shown = this.target;

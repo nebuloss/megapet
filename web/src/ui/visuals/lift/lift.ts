@@ -110,6 +110,9 @@ export class LiftVisual implements SpeedVisual {
    */
   /** Needle position, 0..1. Eased here rather than in Mbps — see `toFraction`. */
   private shownFraction = 0;
+  /** Where the needle is heading, 0..1. Converted when the target is set, so
+   *  the frame loop stays free of transcendental maths. */
+  private aimFraction = 0;
 
   private carTop = CAR.top;
   private driveSign = -1;
@@ -196,10 +199,10 @@ export class LiftVisual implements SpeedVisual {
   // ------------------------------------------------------------- controls --
 
   setPosition(mbps: number): void {
-    this.target = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
+    this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     if (this.reducedMotion.matches) {
       this.shown = this.target;
-    this.shownFraction = toFraction(this.target);
+    this.shownFraction = this.aimFraction;
       this.paint();
       return;
     }
@@ -245,7 +248,7 @@ export class LiftVisual implements SpeedVisual {
   }
 
   reset(): void {
-    this.target = 0;
+    this.aim(0);
     this.reading = null;
     this.driveSign = -1;
     this.root.dataset.drive = 'up';
@@ -300,6 +303,12 @@ export class LiftVisual implements SpeedVisual {
 
   // ---------------------------------------------------------------- motion --
 
+  /** Sets the target and its scale position together; they must never drift. */
+  private aim(mbps: number): void {
+    this.target = mbps;
+    this.aimFraction = toFraction(mbps);
+  }
+
   private startLoop(): void {
     if (this.frame) return;
     this.lastFrameAt = 0;
@@ -307,7 +316,7 @@ export class LiftVisual implements SpeedVisual {
       const dt = this.lastFrameAt ? Math.min(64, now - this.lastFrameAt) : 16;
       this.lastFrameAt = now;
 
-      const aim = toFraction(this.target);
+      const aim = this.aimFraction;
       const before = this.shownFraction;
       this.shown = approach(this.shown, this.target, dt, EASE_TAU);
       this.shownFraction = approach(this.shownFraction, aim, dt, EASE_TAU);
