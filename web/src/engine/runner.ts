@@ -1,7 +1,7 @@
-import type { TestParams } from '../types';
+import type { TestParams } from '../domain/types';
 import { measureLatency, type LatencyResult } from './latency';
 import { sleep } from './sleep';
-import { measureDownload, measureUpload, type TransferResult } from './transfer';
+import { DownloadPhase, UploadPhase, type TransferResult } from './phases';
 
 export type Phase =
   | 'idle'
@@ -129,7 +129,7 @@ export class SpeedTest {
       // ---- reverse, then download ----------------------------------------
       await this.reverse('download', WEIGHTS.latency, emit, signal);
       emit({ phase: 'download' });
-      const download: TransferResult = await measureDownload({
+      const download: TransferResult = await new DownloadPhase({
         base: this.base,
         streams: this.params.download_streams,
         durationMs: this.params.download_seconds * 1000,
@@ -143,7 +143,7 @@ export class SpeedTest {
             progress: DOWNLOAD_FROM + phaseProgress * WEIGHTS.download,
           });
         },
-      });
+      }).run();
       this.throwIfAborted(signal);
       emit({
         downloadMbps: download.mbps,
@@ -155,7 +155,7 @@ export class SpeedTest {
       // ---- reverse, then upload ------------------------------------------
       await this.reverse('upload', DOWNLOAD_FROM + WEIGHTS.download, emit, signal);
       emit({ phase: 'upload', liveMbps: 0 });
-      const upload: TransferResult = await measureUpload({
+      const upload: TransferResult = await new UploadPhase({
         base: this.base,
         streams: this.params.upload_streams,
         durationMs: this.params.upload_seconds * 1000,
@@ -170,7 +170,7 @@ export class SpeedTest {
             progress: UPLOAD_FROM + phaseProgress * WEIGHTS.upload,
           });
         },
-      });
+      }).run();
       this.throwIfAborted(signal);
 
       emit({

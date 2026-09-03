@@ -4,30 +4,31 @@
  * Mounts the real components against a simulated test run so the mechanism can
  * be reviewed without a backend. Not part of the shipped bundle.
  */
-import '../src/styles/tokens.css';
-import '../src/styles/base.css';
-import '../src/styles/components.css';
+import '../src/ui/styles/tokens.css';
+import '../src/ui/styles/base.css';
+import '../src/ui/styles/components.css';
 import './preview.css';
 
-import { toFraction } from '../src/ui/scale';
-import { Gauge } from '../src/ui/gauge';
-import { LiftScene } from '../src/ui/lift';
-import { StatTiles } from '../src/ui/stats';
-import { el } from '../src/ui/dom';
-import { icon, sunIcon } from '../src/ui/icons';
-import { hydrateRipples } from '../src/ui/dom';
-import { SEED_OPTIONS, initTheme, isDark, setMode, setSeed } from '../src/theme';
-import { formatMs, formatSpeed } from '../src/format';
-import type { Drive, GaugeAccent, SpeedVisual } from '../src/ui/visual';
+import { toFraction } from '../src/ui/visuals/scale';
+import { DialVisual } from '../src/ui/visuals/dial';
+import { LiftVisual } from '../src/ui/visuals/lift/lift';
+import { StatTiles } from '../src/ui/features/stat-tiles';
+import { el } from '../src/ui/primitives/dom';
+import { icon, sunIcon } from '../src/ui/primitives/icons';
+import { hydrateRipples } from '../src/ui/primitives/dom';
+import { Preferences } from '../src/core';
+import { SEED_OPTIONS, ThemeController } from '../src/theme';
+import { formatMs, formatSpeed } from '../src/ui/primitives/format';
+import type { Drive, GaugeAccent, SpeedVisual } from '../src/ui/visuals/visual';
 
 // A host page may have already stamped an explicit theme on the document;
 // honour it instead of falling back to the OS preference.
 const hostTheme = document.documentElement.dataset.theme;
-initTheme('#4F6BED');
-if (hostTheme === 'light' || hostTheme === 'dark') setMode(hostTheme);
+const theme = new ThemeController(new Preferences('megapet.preview'), '#4F6BED');
+if (hostTheme === 'light' || hostTheme === 'dark') theme.setMode(hostTheme);
 
-const lift = new LiftScene();
-const dial = new Gauge();
+const lift = new LiftVisual();
+const dial = new DialVisual();
 const stats = new StatTiles();
 const visuals: SpeedVisual[] = [lift, dial];
 
@@ -218,11 +219,11 @@ const presets = el(
 const themeRow = el('div', { class: 'preview__row' });
 const themeToggle = el('button', { class: 'icon-button', type: 'button', title: 'Toggle light and dark' });
 const paintToggle = (): void => {
-  themeToggle.innerHTML = isDark() ? sunIcon() : icon('moon');
+  themeToggle.innerHTML = theme.isDark ? sunIcon() : icon('moon');
 };
 paintToggle();
 themeToggle.addEventListener('click', () => {
-  setMode(isDark() ? 'light' : 'dark');
+  theme.toggleMode();
   paintToggle();
 });
 themeRow.append(themeToggle);
@@ -238,7 +239,7 @@ for (const option of SEED_OPTIONS) {
   swatch.addEventListener('click', () => {
     for (const s of themeRow.querySelectorAll('.swatch')) s.setAttribute('aria-checked', 'false');
     swatch.setAttribute('aria-checked', 'true');
-    setSeed(option.hex);
+    theme.setSeed(option.hex);
   });
   themeRow.append(swatch);
 }

@@ -1,4 +1,4 @@
-import { icon, type IconName } from './icons';
+import { icon, type IconName } from '../primitives/icons';
 import { TICKS, toFraction } from './scale';
 import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
 
@@ -37,8 +37,8 @@ function arcPath(radius: number, sweep: number): string {
   );
 }
 
-/** The classic circular dial, kept as an alternative to the lift scene. */
-export class Gauge implements SpeedVisual {
+/** The plain circular dial: the alternative to the lift scene. */
+export class DialVisual implements SpeedVisual {
   readonly root: HTMLElement;
 
   /** Nothing to watch here, so the dial only pauses long enough to settle. */

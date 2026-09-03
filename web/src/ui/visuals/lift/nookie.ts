@@ -5,7 +5,7 @@
  * palette stops being the same character — while the scarf takes the Material
  * You seed so he still belongs to the theme.
  */
-import { clamp, lerp } from '../../mech';
+import { clamp, lerp } from '../../../mech';
 import { LEVER, NOOKIE } from './layout';
 
 /** Shoulder and rest-pose hand, in Nookies' own coordinates. */

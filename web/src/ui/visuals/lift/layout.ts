@@ -6,7 +6,7 @@
  * whole trick: nothing ever meshes or unmeshes, so no part can be driven
  * through another, and the two directions travel at the same rate.
  */
-import { gear, pulley, toRadians, type Gear, type Point, type Pulley } from '../../mech';
+import { gear, pulley, toRadians, type Gear, type Point, type Pulley } from '../../../mech';
 
 export const MODULE = 2.6;
 

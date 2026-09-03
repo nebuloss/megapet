@@ -1,4 +1,5 @@
-import type { IconName } from './icons';
+import type { View } from '../../core';
+import type { IconName } from '../primitives/icons';
 
 export type GaugeAccent = 'primary' | 'tertiary' | 'secondary';
 
@@ -12,8 +13,7 @@ export type Drive = 'down' | 'up';
  * Position and readout are separate on purpose: the latency phase shows
  * milliseconds, which have no meaningful place on a throughput scale.
  */
-export interface SpeedVisual {
-  readonly root: HTMLElement;
+export interface SpeedVisual extends View {
   /**
    * How long this visual needs to change direction. The runner holds between
    * phases for exactly this long, so a visual with a drive train to show gets
@@ -41,7 +41,6 @@ export interface SpeedVisual {
   setPhase(label: string | null, icon?: IconName): void;
   /** Tells the visual whether a test is currently under way. */
   setActive(active: boolean): void;
-  destroy(): void;
 }
 
 /** Formats a readout number according to its unit. */

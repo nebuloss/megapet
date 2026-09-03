@@ -1,5 +1,5 @@
 /** Easing and stage timing for hand-driven animation. */
-import { clamp } from '../mech';
+import { clamp } from '../../mech';
 
 /** Progress through one stage of a longer sequence, given overall progress. */
 export function stage(t: number, [from, to]: readonly [number, number]): number {

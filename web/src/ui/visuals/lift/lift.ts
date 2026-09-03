@@ -11,9 +11,9 @@ import {
   toDegrees,
   toRadians,
   wrapTau,
-} from '../../mech';
-import { approach, easeInOut, easeOutBack, stage } from '../anim';
-import { icon, type IconName } from '../icons';
+} from '../../../mech';
+import { approach, easeInOut, easeOutBack, stage } from '../../primitives/anim';
+import { icon, type IconName } from '../../primitives/icons';
 import { toFraction } from '../scale';
 import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from '../visual';
 import {
@@ -68,7 +68,7 @@ let instanceCount = 0;
  * the belt is mid-shift the sheave is held by its brake, so the car is
  * genuinely disconnected from the needle instead of being yanked about by it.
  */
-export class LiftScene implements SpeedVisual {
+export class LiftVisual implements SpeedVisual {
   readonly root: HTMLElement;
 
   readonly transitionMs = SHIFT_MS + 250;

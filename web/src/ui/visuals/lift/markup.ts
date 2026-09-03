@@ -1,5 +1,5 @@
 /** The scene's SVG. Everything that moves carries a class the scene can find. */
-import { gearOutline, polar, toRadians, type Gear } from '../../mech';
+import { gearOutline, polar, toRadians, type Gear } from '../../../mech';
 import { TICKS, toFraction } from '../scale';
 import { nookieMarkup } from './nookie';
 import {
