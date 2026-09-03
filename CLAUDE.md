@@ -34,11 +34,17 @@ back here before syncing again or the change is lost.
   covered by unit tests (`npm test` in `web/`). Ratios here are tooth counts,
   never radii, and every gear is cut to one module — mixing modules is what
   makes teeth stop lining up.
-- `web/src/ui/lift` — the hero visual built on that library. `layout.ts` derives
-  the whole scene (the train, both yoke seats, the rope pin, the spring seat)
-  rather than hard-coding angles; `markup.ts` is the SVG; `index.ts` holds the
-  eased state and runs the throw's stages in order. `web/src/ui/gauge.ts` is the
-  alternative plain dial. Both satisfy `SpeedVisual`.
+- `web/src/ui/lift` — the hero visual. The needle drives one gear pair that
+  never leaves mesh, and that drives the sheave through a belt; crossing the
+  belt is what reverses the lift. Do not reintroduce a gear that swings in and
+  out of mesh: at this scale an idler bridging two gears is wider than the gap
+  it would have to leave through, so it gets drawn straight through its
+  neighbours. `layout.ts` is the scene, `markup.ts` the SVG, `index.ts` the
+  state and the throw's stages. `web/src/ui/gauge.ts` is the alternative plain
+  dial. Both satisfy `SpeedVisual`.
+- The car's position is **carried state**, never computed from the reading. A
+  formula like `anchor + sign * fraction * travel` teleports the car the moment
+  `sign` flips, because the eased reading has not caught up yet.
 - `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.
   Stylesheets must only ever read those tokens, never hard-code a colour.
 

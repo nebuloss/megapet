@@ -8,4 +8,5 @@ export * from './gear';
 export * from './tumbler';
 export * from './rope';
 export * from './linkage';
+export * from './belt';
 export * from './draw';

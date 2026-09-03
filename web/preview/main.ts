@@ -195,7 +195,7 @@ const presets = el(
     drive('down');
     for (const visual of visuals) visual.setPhase(null);
   }),
-  button('Reverse the gear', () => {
+  button('Cross the belt', () => {
     stopSimulation();
     manualDrive = manualDrive === 'down' ? 'up' : 'down';
     drive(manualDrive);
@@ -251,10 +251,10 @@ root.append(
     el('header', { class: 'preview__head' },
       el('h1', {}, 'Nookies lift'),
       el('p', {},
-        'The needle and the lift are one machine. To change direction Nookies throws ' +
-        'the lever in the car; the pull runs down the rope, over the guide pulley and ' +
-        'onto the bellcrank, and the yoke rocks the swing gear across. Press ' +
-        '“Reverse the gear” and watch the throw travel through the linkage.'),
+        'The needle turns a gear pair that never leaves mesh, and that drives the ' +
+        'sheave through a belt. Nookies pulls the lever, the shifter fork walks the ' +
+        'belt from open to crossed, and the lift runs the other way. The brake holds ' +
+        'the car while the belt is mid-shift, so nothing is ever yanked about.'),
     ),
     themeRow,
     el('div', { class: 'preview__stage' },

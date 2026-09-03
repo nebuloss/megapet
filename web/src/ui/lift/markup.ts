@@ -1,12 +1,17 @@
-/** The scene's SVG. Everything that moves is given a class the scene can find. */
+/** The scene's SVG. Everything that moves carries a class the scene can find. */
 import { gearOutline, polar, toRadians, type Gear } from '../../mech';
 import { TICKS, toFraction } from '../scale';
 import { nookieMarkup } from './nookie';
 import {
   ARC_LENGTH,
+  BRAKE,
   CAR,
   DIAL,
+  DRIVE,
+  DRIVEN,
+  FORK,
   HUB,
+  LAY,
   LEVER,
   MODULE,
   NEEDLE_LENGTH,
@@ -14,7 +19,6 @@ import {
   PAWL_ANGLE,
   PAWL_RADIUS,
   PULLEY,
-  REVERSE,
   RING_LENGTH,
   ROPE_PIN_BASE,
   ROPE_RUN_X,
@@ -22,14 +26,11 @@ import {
   SHEAVE,
   SHIFT_DRUM_R,
   SPRING_ANCHOR,
-  SPRING_PIN_R,
   SPRING_PIN_BASE,
+  SPRING_PIN_R,
   START_ANGLE,
   SWEEP,
-  SWING_BASE,
   WEIGHT,
-  YOKE_DOWN,
-  YOKE_UP,
 } from './layout';
 
 function gearGroup(name: string, g: Gear, inner = ''): string {
@@ -79,23 +80,23 @@ export function liftMarkup(clipId: string): string {
     )
     .join('');
 
-  // Detent notches, cut into the drum where the pawl meets it at each seat.
-  const notches = [YOKE_UP, YOKE_DOWN]
+  const notches = [FORK.open, FORK.crossed]
     .map((seat) => {
       const p = polar({ x: 0, y: 0 }, SHIFT_DRUM_R, toRadians(PAWL_ANGLE - seat));
       return `<circle class="lift__detent-notch" cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="2"/>`;
     })
     .join('');
 
-  const ropePin = polar(HUB, SHIFT_DRUM_R, toRadians(ROPE_PIN_BASE));
-  const springPin = polar(HUB, SPRING_PIN_R, toRadians(SPRING_PIN_BASE));
-  const pawlRoller = polar(HUB, PAWL_RADIUS, toRadians(PAWL_ANGLE));
-  const pawlTail = polar(HUB, 27, toRadians(PAWL_ANGLE));
-  const pawlNeck = polar(HUB, PAWL_RADIUS + 2.2, toRadians(PAWL_ANGLE));
+  const ropePin = polar(FORK, SHIFT_DRUM_R, toRadians(ROPE_PIN_BASE));
+  const springPin = polar(FORK, SPRING_PIN_R, toRadians(SPRING_PIN_BASE));
+  const pawlRoller = polar(FORK, PAWL_RADIUS, toRadians(PAWL_ANGLE));
+  const pawlTail = polar(FORK, 26, toRadians(PAWL_ANGLE));
+  const pawlNeck = polar(FORK, PAWL_RADIUS + 2.2, toRadians(PAWL_ANGLE));
+  const brakePivot = polar(SHEAVE, BRAKE.arm + 16, toRadians(BRAKE.angle));
 
   return `
 <svg viewBox="0 0 280 384" class="lift__svg" role="img"
-     aria-label="A speed dial geared to a lift through a tumbler reverse: Nookies the bear pulls a lever whose rope throws the gearbox, sending the car down for download and up for upload">
+     aria-label="A speed dial driving a lift through a belt: Nookies the bear pulls a lever that crosses the belt over, sending the car down for download and up for upload">
   <defs>
     <clipPath id="${clipId}">
       <rect x="${SHAFT.x + 2}" y="${SHAFT.y + 2}" width="${SHAFT.w - 4}" height="${SHAFT.h - 4}" rx="10"/>
@@ -120,10 +121,32 @@ export function liftMarkup(clipId: string): string {
   </g>
   <rect class="lift__shaft-frame" x="${SHAFT.x}" y="${SHAFT.y}" width="${SHAFT.w}" height="${SHAFT.h}" rx="12"/>
 
-  ${gearGroup('sheave', SHEAVE, `<circle class="lift__gear-hub" r="6"/><circle class="lift__sheave-groove" r="${(SHEAVE.radius - 4).toFixed(1)}"/>`)}
+  <!-- traction sheave, with the belt step on the same shaft -->
+  <g class="lift__sheave">
+    <circle class="lift__sheave-body" cx="${SHEAVE.x}" cy="${SHEAVE.y}" r="${SHEAVE.radius}"/>
+    <circle class="lift__sheave-groove" cx="${SHEAVE.x}" cy="${SHEAVE.y}" r="${SHEAVE.radius - 4}"/>
+    <g class="lift__sheave-spin" transform="translate(${SHEAVE.x} ${SHEAVE.y})">
+      <path class="lift__sheave-spoke" d="M0 -19V19M-19 0H19M-13.4 -13.4L13.4 13.4M-13.4 13.4L13.4 -13.4"/>
+    </g>
+  </g>
   <path class="lift__cable" d="M${CAR.x} ${SHEAVE.y} A ${SHEAVE.radius} ${SHEAVE.radius} 0 0 1 ${WEIGHT.x} ${SHEAVE.y}"/>
   <line class="lift__cable lift__cable--car" x1="${CAR.x}" y1="${SHEAVE.y}" x2="${CAR.x}" y2="${CAR.top}"/>
   <line class="lift__cable lift__cable--weight" x1="${WEIGHT.x}" y1="${SHEAVE.y}" x2="${WEIGHT.x}" y2="${WEIGHT.low}"/>
+
+  <!-- the belt, and the two pulleys it runs on -->
+  <path class="lift__belt lift__belt--a"/>
+  <path class="lift__belt lift__belt--b"/>
+  <circle class="lift__pulley-rim" cx="${DRIVEN.x}" cy="${DRIVEN.y}" r="${DRIVEN.radius}"/>
+  ${gearGroup('lay', LAY, `<circle class="lift__pulley-rim" r="${DRIVE.radius}"/><circle class="lift__gear-hub" r="4"/>`)}
+
+  <!-- spring-applied brake: it holds the sheave while the belt is shifted -->
+  <g class="lift__brake">
+    <circle class="lift__brake-pivot" cx="${brakePivot.x.toFixed(1)}" cy="${brakePivot.y.toFixed(1)}" r="2.6"/>
+    <path class="lift__brake-arm" d="M${brakePivot.x.toFixed(1)} ${brakePivot.y.toFixed(1)}L${polar(SHEAVE, SHEAVE.radius + 4, toRadians(BRAKE.angle)).x.toFixed(1)} ${polar(SHEAVE, SHEAVE.radius + 4, toRadians(BRAKE.angle)).y.toFixed(1)}"/>
+    <g class="lift__brake-shoe-group">
+      <circle class="lift__brake-shoe" cx="${polar(SHEAVE, SHEAVE.radius + 3, toRadians(BRAKE.angle)).x.toFixed(1)}" cy="${polar(SHEAVE, SHEAVE.radius + 3, toRadians(BRAKE.angle)).y.toFixed(1)}" r="${BRAKE.shoe}"/>
+    </g>
+  </g>
 
   <g class="lift__weight" transform="translate(0 ${WEIGHT.low})">
     <rect class="lift__weight-body" x="${WEIGHT.x - WEIGHT.w / 2}" y="0" width="${WEIGHT.w}" height="${WEIGHT.h}" rx="3"/>
@@ -154,18 +177,14 @@ export function liftMarkup(clipId: string): string {
   <circle class="lift__pulley" cx="${PULLEY.x}" cy="${PULLEY.y}" r="${PULLEY.r}"/>
   <circle class="lift__pulley-hub" cx="${PULLEY.x}" cy="${PULLEY.y}" r="1.8"/>
 
-  ${gearGroup('reverse', REVERSE, `<circle class="lift__gear-hub" r="3.8"/>`)}
-
-  <g class="lift__yoke" transform="rotate(${YOKE_UP.toFixed(2)} ${HUB.x} ${HUB.y})">
-    <path class="lift__yoke-arm" d="M${HUB.x} ${HUB.y}V${SWING_BASE.y.toFixed(2)}"/>
-    ${gearGroup('swing', SWING_BASE, `<circle class="lift__gear-hub" r="4"/>`)}
-  </g>
-
   ${gearGroup('hub', HUB, `<path class="lift__needle" d="M-3.4 0 L0 -${NEEDLE_LENGTH} L3.4 0 Z"/>`)}
 
-  <g class="lift__shifter" transform="rotate(${YOKE_UP.toFixed(2)} ${HUB.x} ${HUB.y})">
-    <circle class="lift__shift-drum" cx="${HUB.x}" cy="${HUB.y}" r="${SHIFT_DRUM_R}"/>
-    <g transform="translate(${HUB.x} ${HUB.y})">${notches}</g>
+  <!-- the shifter fork that walks the belt across, and its drum, spring and detent -->
+  <g class="lift__shifter" transform="rotate(${FORK.crossed} ${FORK.x} ${FORK.y})">
+    <path class="lift__fork-arm" d="M${FORK.x} ${FORK.y}L${(FORK.x + FORK.arm).toFixed(1)} ${FORK.y}"/>
+    <path class="lift__fork-prongs" d="M${(FORK.x + FORK.arm - 3).toFixed(1)} ${FORK.y - 7}v14M${(FORK.x + FORK.arm + 3).toFixed(1)} ${FORK.y - 7}v14"/>
+    <circle class="lift__shift-drum" cx="${FORK.x}" cy="${FORK.y}" r="${SHIFT_DRUM_R}"/>
+    <g transform="translate(${FORK.x} ${FORK.y})">${notches}</g>
     <circle class="lift__rope-pin" cx="${ropePin.x.toFixed(2)}" cy="${ropePin.y.toFixed(2)}" r="2"/>
     <circle class="lift__spring-pin" cx="${springPin.x.toFixed(2)}" cy="${springPin.y.toFixed(2)}" r="2"/>
   </g>
