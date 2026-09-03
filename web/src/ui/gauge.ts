@@ -41,6 +41,9 @@ function arcPath(radius: number, sweep: number): string {
 export class Gauge implements SpeedVisual {
   readonly root: HTMLElement;
 
+  /** Nothing to watch here, so the dial only pauses long enough to settle. */
+  readonly transitionMs = 400;
+
   private readonly valueArc: SVGPathElement;
   private readonly ringArc: SVGPathElement;
   private readonly numberEl: HTMLElement;

@@ -37,6 +37,10 @@ back here before syncing again or the change is lost.
   reading as one movement. `CRANK_BASE` is solved at module load so the rope
   pulls straight at the hub in the upload seat; that is where the throw is
   largest, so do not replace it with a hand-picked angle.
+- The runner holds a `reversing` phase between measurements for
+  `SpeedVisual.transitionMs`, which is what gives the shift a stage of its own.
+  The first fifth of `SHIFT_MS` is deliberately still, so the needle has fallen
+  to zero before the throw begins.
 - `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.
   Stylesheets must only ever read those tokens, never hard-code a colour.
 

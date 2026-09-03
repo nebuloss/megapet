@@ -65,6 +65,12 @@ during a migration. Minimum and maximum are stored alongside it.
 
 **Jitter** is the mean absolute difference between consecutive round trips.
 
+**Reversing.** Between phases the test holds for as long as the visual says it
+needs (`SpeedVisual.transitionMs`): the reading is pinned to zero, the dial
+settles, and the drive train changes direction with nothing else moving. On the
+lift that is ~1.75 s each side, so a run costs about 3.5 s more than the raw
+measurement; the plain dial pauses for 0.4 s.
+
 **Throughput.** `download_streams` (or `upload_streams`) workers run
 concurrently for the configured duration. Bytes are accumulated continuously,
 but the reported figure covers only the window *after* `grace_seconds` — during

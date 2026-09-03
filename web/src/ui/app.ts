@@ -39,6 +39,8 @@ interface PhaseStyle {
 
 const PHASES: Record<Phase, PhaseStyle | null> = {
   idle: null,
+  // Handled separately: its direction comes from the phase it is setting up.
+  reversing: null,
   latency: {
     label: 'Latency', icon: 'latency', accent: 'secondary',
     unit: 'ms', tile: 'ping', drive: 'up',
@@ -407,13 +409,14 @@ export class App {
     this.setStartButton('stop');
 
     const base = this.peer ? normalizeBase(this.peer.url) : '';
-    this.test = new SpeedTest(this.config.test, base);
+    // The visual decides how long the between-phase pause needs to be.
+    this.test = new SpeedTest(this.config.test, base, this.visual.transitionMs);
 
     let lastPhase: Phase = 'idle';
     const snapshot = await this.test.run((s) => {
       if (s.phase !== lastPhase) {
         lastPhase = s.phase;
-        this.applyPhase(s.phase);
+        this.applyPhase(s);
       }
       this.applySnapshot(s);
     });
@@ -444,11 +447,21 @@ export class App {
     await this.persist(snapshot);
   }
 
-  private applyPhase(phase: Phase): void {
-    const style = PHASES[phase];
+  private applyPhase(s: Snapshot): void {
+    if (s.phase === 'reversing') {
+      // Selected before the reading is applied, so the gear shift re-anchors
+      // on where the car actually is rather than moving it.
+      this.visual.setDrive(s.nextPhase === 'download' ? 'down' : 'up');
+      this.visual.setAccent('secondary');
+      this.visual.setPhase('Reversing', 'replay');
+      this.visual.setReading(null, 'Mbps');
+      this.stats.setActive(null);
+      this.announce(`Reversing the drive for the ${s.nextPhase ?? 'next'} test.`);
+      return;
+    }
+
+    const style = PHASES[s.phase];
     if (!style) return;
-    // Selected before the reading is applied, so the gear shift re-anchors on
-    // where the car actually is rather than moving it.
     this.visual.setDrive(style.drive);
     this.visual.setAccent(style.accent);
     this.visual.setPhase(style.label, style.icon);
@@ -459,6 +472,13 @@ export class App {
 
   private applySnapshot(s: Snapshot): void {
     this.visual.setProgress(s.progress);
+
+    if (s.phase === 'reversing') {
+      // The reading is pinned at zero here so the machine can be seen changing
+      // over; the tiles keep whatever the last phase measured.
+      this.visual.setPosition(0);
+      return;
+    }
 
     if (s.phase === 'latency') {
       // Milliseconds have no place on a throughput scale, so the lift stays put

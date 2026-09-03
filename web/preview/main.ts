@@ -69,35 +69,50 @@ function resetAll(): void {
   stats.reset();
 }
 
-/** Replays a plausible latency → download → upload run. */
+/**
+ * Replays a plausible run, including the pause the real runner takes between
+ * phases so the reversal can be watched on its own.
+ */
 function simulate(): void {
   resetAll();
   const start = performance.now();
   const target = 940;
+  const beat = lift.transitionMs / 1000;
+
+  // Phase boundaries, in seconds from the start.
+  const latencyEnd = 2.5;
+  const shiftDownEnd = latencyEnd + beat;
+  const downloadEnd = shiftDownEnd + 10;
+  const shiftUpEnd = downloadEnd + beat;
+  const uploadEnd = shiftUpEnd + 10;
+
   for (const visual of visuals) visual.setActive(true);
 
   simulation = window.setInterval(() => {
     const t = (performance.now() - start) / 1000;
 
-    if (t < 2.5) {
+    if (t < latencyEnd) {
       const rtt = 0.4 + Math.random() * 0.35;
-      drive('up');
       for (const visual of visuals) {
         visual.setAccent('secondary');
         visual.setPhase('Latency', 'latency');
         visual.setReading(rtt, 'ms');
         visual.setPosition(0);
-        visual.setProgress(t / 2.5);
+        visual.setProgress(t / latencyEnd);
       }
       stats.setActive('ping');
       stats.set('ping', formatMs(rtt));
       return;
     }
 
-    if (t < 12.5) {
-      const p = (t - 2.5) / 10;
+    if (t < shiftDownEnd) {
+      reverse('down', (t - latencyEnd) / beat);
+      return;
+    }
+
+    if (t < downloadEnd) {
+      const p = (t - shiftDownEnd) / 10;
       const value = target * (1 - Math.exp(-p * 4)) * (0.94 + Math.random() * 0.09);
-      drive('down');
       for (const visual of visuals) {
         visual.setPhase('Download', 'download');
         visual.setProgress(p);
@@ -107,10 +122,14 @@ function simulate(): void {
       return;
     }
 
-    if (t < 22.5) {
-      const p = (t - 12.5) / 10;
+    if (t < shiftUpEnd) {
+      reverse('up', (t - downloadEnd) / beat);
+      return;
+    }
+
+    if (t < uploadEnd) {
+      const p = (t - shiftUpEnd) / 10;
       const value = target * 0.94 * (1 - Math.exp(-p * 4)) * (0.94 + Math.random() * 0.09);
-      drive('up');
       for (const visual of visuals) {
         visual.setPhase('Upload', 'upload');
         visual.setProgress(p);
@@ -123,7 +142,20 @@ function simulate(): void {
     for (const visual of visuals) visual.setPhase('Complete', 'check');
     stats.setActive(null);
     stopSimulation();
-  }, 80);
+  }, 60);
+}
+
+/** The between-phase hold: reading pinned at zero while the machine changes over. */
+function reverse(direction: Drive, progress: number): void {
+  drive(direction);
+  for (const visual of visuals) {
+    visual.setAccent('secondary');
+    visual.setPhase('Reversing', 'replay');
+    visual.setReading(null, 'Mbps');
+    visual.setPosition(0);
+    visual.setProgress(progress);
+  }
+  stats.setActive(null);
 }
 
 // ------------------------------------------------------------------ chrome --

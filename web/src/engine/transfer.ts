@@ -1,4 +1,5 @@
 import { RateMeter } from './meter';
+import { sleep } from './sleep';
 
 export interface TransferResult {
   /** Throughput over the measurement window, in Mbps. */
@@ -235,14 +236,5 @@ function clamp(value: number, lo: number, hi: number): number {
 }
 
 function backoff(attempt: number, signal: AbortSignal): Promise<void> {
-  const ms = Math.min(500, 50 * 2 ** attempt);
-  return new Promise((resolve) => {
-    const timer = setTimeout(done, ms);
-    signal.addEventListener('abort', done, { once: true });
-    function done(): void {
-      clearTimeout(timer);
-      signal.removeEventListener('abort', done);
-      resolve();
-    }
-  });
+  return sleep(Math.min(500, 50 * 2 ** attempt), signal);
 }

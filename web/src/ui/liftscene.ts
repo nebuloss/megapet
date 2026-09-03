@@ -93,14 +93,20 @@ const CRANK_BASE = ((): { x: number; y: number } => {
   };
 })();
 
-/** How long a full shift takes, and when each stage of it runs. */
-const SHIFT_MS = 1150;
+/**
+ * How long a full shift takes, and when each stage of it runs.
+ *
+ * Nothing moves for the first fifth: the reading has just been pinned to zero
+ * and the needle needs that long to fall, so the throw starts against a still
+ * machine instead of competing with it.
+ */
+const SHIFT_MS = 1500;
 const STAGE = {
-  reach: [0.0, 0.18],
-  lever: [0.16, 0.44],
-  rope: [0.28, 0.66],
-  yoke: [0.5, 0.84],
-  release: [0.8, 1.0],
+  reach: [0.2, 0.36],
+  lever: [0.34, 0.58],
+  rope: [0.46, 0.76],
+  yoke: [0.62, 0.9],
+  release: [0.87, 1.0],
 } as const;
 
 /** Length of the highlight that travels up the rope, in path units. */
@@ -233,6 +239,9 @@ function gearMarkup(
 
 export class LiftScene implements SpeedVisual {
   readonly root: HTMLElement;
+
+  /** The shift, plus a beat to look at it before the next phase loads up. */
+  readonly transitionMs = SHIFT_MS + 250;
 
   private readonly svg: SVGSVGElement;
   private readonly carGroup: SVGGElement;

@@ -1,8 +1,17 @@
 import type { TestParams } from '../types';
 import { measureLatency, type LatencyResult } from './latency';
+import { sleep } from './sleep';
 import { measureDownload, measureUpload, type TransferResult } from './transfer';
 
-export type Phase = 'idle' | 'latency' | 'download' | 'upload' | 'done' | 'aborted' | 'error';
+export type Phase =
+  | 'idle'
+  | 'latency'
+  | 'reversing'
+  | 'download'
+  | 'upload'
+  | 'done'
+  | 'aborted'
+  | 'error';
 
 export interface Snapshot {
   phase: Phase;
@@ -18,11 +27,17 @@ export interface Snapshot {
   uploadMbps: number;
   downloadBytes: number;
   uploadBytes: number;
+  /** During `reversing`, the phase the machine is being set up for. */
+  nextPhase?: 'download' | 'upload';
   error?: string;
 }
 
 /** Share of the overall progress bar given to each phase. */
-const WEIGHTS = { latency: 0.12, download: 0.46, upload: 0.42 } as const;
+const WEIGHTS = { latency: 0.1, reverse: 0.04, download: 0.42, upload: 0.4 } as const;
+
+/** Where each measuring phase starts on the overall progress bar. */
+const DOWNLOAD_FROM = WEIGHTS.latency + WEIGHTS.reverse;
+const UPLOAD_FROM = DOWNLOAD_FROM + WEIGHTS.download + WEIGHTS.reverse;
 
 export function emptySnapshot(): Snapshot {
   return {
@@ -45,9 +60,17 @@ export class SpeedTest {
   private snapshot = emptySnapshot();
   private running = false;
 
+  /**
+   * `reverseMs` is a deliberate pause between phases. The direction of travel
+   * changes there, and on a visual that shows the drive train that change is
+   * worth watching with nothing else moving — so the reading is allowed to
+   * settle, the machine is reversed, and only then does the next phase start
+   * loading the link.
+   */
   constructor(
     private readonly params: TestParams,
     private readonly base = '',
+    private readonly reverseMs = 0,
   ) {}
 
   get isRunning(): boolean {
@@ -103,7 +126,8 @@ export class SpeedTest {
         liveMbps: 0,
       });
 
-      // ---- download ------------------------------------------------------
+      // ---- reverse, then download ----------------------------------------
+      await this.reverse('download', WEIGHTS.latency, emit, signal);
       emit({ phase: 'download' });
       const download: TransferResult = await measureDownload({
         base: this.base,
@@ -116,7 +140,7 @@ export class SpeedTest {
           emit({
             liveMbps: mbps,
             downloadMbps: mbps,
-            progress: WEIGHTS.latency + phaseProgress * WEIGHTS.download,
+            progress: DOWNLOAD_FROM + phaseProgress * WEIGHTS.download,
           });
         },
       });
@@ -125,10 +149,11 @@ export class SpeedTest {
         downloadMbps: download.mbps,
         downloadBytes: download.totalBytes,
         liveMbps: download.mbps,
-        progress: WEIGHTS.latency + WEIGHTS.download,
+        progress: DOWNLOAD_FROM + WEIGHTS.download,
       });
 
-      // ---- upload --------------------------------------------------------
+      // ---- reverse, then upload ------------------------------------------
+      await this.reverse('upload', DOWNLOAD_FROM + WEIGHTS.download, emit, signal);
       emit({ phase: 'upload', liveMbps: 0 });
       const upload: TransferResult = await measureUpload({
         base: this.base,
@@ -142,7 +167,7 @@ export class SpeedTest {
           emit({
             liveMbps: mbps,
             uploadMbps: mbps,
-            progress: WEIGHTS.latency + WEIGHTS.download + phaseProgress * WEIGHTS.upload,
+            progress: UPLOAD_FROM + phaseProgress * WEIGHTS.upload,
           });
         },
       });
@@ -166,6 +191,23 @@ export class SpeedTest {
     } finally {
       this.running = false;
     }
+  }
+
+  /**
+   * Holds between phases while the drive direction changes. The reading is
+   * pinned at zero so the dial settles and the machine can be seen changing
+   * over on its own.
+   */
+  private async reverse(
+    next: 'download' | 'upload',
+    progress: number,
+    emit: (patch: Partial<Snapshot>) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (this.reverseMs <= 0) return;
+    emit({ phase: 'reversing', nextPhase: next, liveMbps: 0, progress });
+    await sleep(this.reverseMs, signal);
+    this.throwIfAborted(signal);
   }
 
   /**

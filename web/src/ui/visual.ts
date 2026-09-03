@@ -14,6 +14,12 @@ export type Drive = 'down' | 'up';
  */
 export interface SpeedVisual {
   readonly root: HTMLElement;
+  /**
+   * How long this visual needs to change direction. The runner holds between
+   * phases for exactly this long, so a visual with a drive train to show gets
+   * the stage to itself and a plain dial barely pauses at all.
+   */
+  readonly transitionMs: number;
   /** Positions the dial or lift on the shared log scale, in Mbps. */
   setPosition(mbps: number): void;
   /**

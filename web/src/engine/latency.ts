@@ -1,3 +1,5 @@
+import { sleep } from './sleep';
+
 export interface LatencyResult {
   samples: number[];
   min: number;
@@ -90,17 +92,4 @@ function summarize(samples: number[]): LatencyResult {
     max: sorted[sorted.length - 1] ?? 0,
     jitter,
   };
-}
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal.aborted) return resolve();
-    const timer = setTimeout(done, ms);
-    signal.addEventListener('abort', done, { once: true });
-    function done(): void {
-      clearTimeout(timer);
-      signal.removeEventListener('abort', done);
-      resolve();
-    }
-  });
 }
