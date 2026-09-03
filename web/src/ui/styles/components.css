@@ -7,9 +7,12 @@
   padding: 1.25rem;
 }
 
+/* Boundaries use `outline`, not `outline-variant`: the latter is M3's
+   decorative divider tone and measures 1.6:1 against the surface, well under
+   the 3:1 a UI component needs to be perceivable. */
 .card--outlined {
   background: var(--md-sys-color-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  border: 1px solid var(--md-sys-color-outline);
 }
 
 .card--flat {
@@ -295,7 +298,7 @@
 }
 
 .gauge__tick {
-  stroke: var(--md-sys-color-outline-variant);
+  stroke: var(--md-sys-color-outline);
   stroke-linecap: round;
 }
 
@@ -425,7 +428,7 @@
   gap: 0.4rem;
   padding: 0.3rem 0.75rem;
   border-radius: var(--md-sys-shape-corner-sm);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  border: 1px solid var(--md-sys-color-outline);
   background: transparent;
   color: var(--md-sys-color-on-surface-variant);
   font: var(--md-sys-typescale-label-medium);
@@ -707,7 +710,7 @@
   min-width: 0;
   padding: 0.6rem 0.75rem;
   border-radius: var(--md-sys-shape-corner-sm);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  border: 1px solid var(--md-sys-color-outline);
   background: var(--md-sys-color-surface-container-lowest);
   font: var(--md-sys-typescale-body-small);
   font-family: var(--md-ref-font-mono);
@@ -969,7 +972,7 @@
 
 .lift__bracket {
   fill: none;
-  stroke: var(--md-sys-color-outline-variant);
+  stroke: var(--md-sys-color-outline);
   stroke-width: 2;
   stroke-linecap: round;
 }
@@ -1002,7 +1005,7 @@
 
 .lift__shaft-frame {
   fill: none;
-  stroke: var(--md-sys-color-outline-variant);
+  stroke: var(--md-sys-color-outline);
   stroke-width: 2;
 }
 
@@ -1043,7 +1046,7 @@
 .lift__car-roof,
 .lift__weight-body {
   fill: var(--md-sys-color-surface-container-highest);
-  stroke: var(--md-sys-color-outline-variant);
+  stroke: var(--md-sys-color-outline);
   stroke-width: 1.3;
 }
 
@@ -1221,4 +1224,59 @@
   display: grid;
   justify-items: center;
   width: 100%;
+}
+
+/* ------------------------------------------------------------------ phone */
+
+/*
+ * A phone has the whole width to itself, so the constraint is height. These
+ * numbers are chosen so the visual, the readout, the button and all four
+ * figures land on the first screen of a 390x760 viewport — during a test you
+ * want the numbers visible without scrolling.
+ */
+@media (max-width: 30rem) {
+  .hero {
+    gap: 1rem;
+    padding: 1.25rem 1rem;
+  }
+
+  .lift__stage {
+    height: clamp(13rem, 34dvh, 30rem);
+  }
+
+  /* Four across rather than two-by-two: the same information, half the height. */
+  .stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .stat {
+    padding: 0.6rem 0.45rem;
+    gap: 0.1rem;
+  }
+
+  .stat__head {
+    font: var(--md-sys-typescale-label-small);
+    gap: 0.25rem;
+  }
+
+  .stat__head svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  .stat__value {
+    font: var(--md-sys-typescale-title-large);
+  }
+
+  .stat__unit {
+    font: var(--md-sys-typescale-label-small);
+  }
+
+  /* The figures are what matter on a small screen; the row's own metadata can
+     wrap out of the way. */
+  .list-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+  }
 }
