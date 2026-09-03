@@ -131,9 +131,12 @@ export class TestController {
     visual: SpeedVisual,
     peer: Peer | null,
   ): Promise<void> {
-    // However the run ended, the machine returns the car to the ground floor.
-    // Nothing waits for it: the results are read while the car comes home.
+    // However the run ended, the machine goes back to rest: the car to the
+    // ground floor and the accent to its resting colour, which the upload
+    // phase would otherwise leave on tertiary. Nothing waits for the car —
+    // the results are read while it comes home.
     visual.park();
+    visual.setAccent('primary');
     if (snapshot.phase === 'error') {
       visual.setPhase('Failed', 'close');
       this.deps.announce('The test failed.');

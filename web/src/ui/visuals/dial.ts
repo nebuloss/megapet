@@ -157,6 +157,9 @@ export class DialVisual implements SpeedVisual {
   }
 
   reset(): void {
+    // Back to the resting colour. The upload leaves the machine on the
+    // tertiary accent, and nothing else puts it back.
+    this.setAccent('primary');
     this.aim(0);
     this.shown = 0;
     this.shownFraction = 0;
