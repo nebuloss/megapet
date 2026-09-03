@@ -2,13 +2,17 @@
 
 ## Reporting a vulnerability
 
-Report it privately through GitHub Security Advisories rather than a public
-issue for anything exploitable.
+Please report privately, not in a public issue:
+**[open a draft advisory](https://github.com/nebuloss/megapet/security/advisories/new)**
+under the repository's Security tab.
 
 Include what you did, what happened, and what you expected. A minimal
-reproduction helps more than anything else. I'll acknowledge and tell you
-whether I think it's a real issue; if it is, I'll agree a disclosure timeline
-with you.
+reproduction helps more than anything else. You'll get an acknowledgement and
+a view on whether it looks like a real issue; if it is, we'll agree a
+disclosure timeline.
+
+Deliberately no email address here — the reporting channel is GitHub's, so
+nothing has to be published to be reachable.
 
 ## What this software is, from a security point of view
 
