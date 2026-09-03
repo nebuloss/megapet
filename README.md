@@ -35,8 +35,10 @@ result history.
   (three meshes, drum anticlockwise, car down). So downloads send the car
   *down* the shaft and uploads wind it back *up*, and the car's travel is
   derived from the needle angle through the train rather than animated beside
-  it. A beige bear rides inside. A plain circular dial is one menu click away
-  for anyone who wants the boring version.
+  it. Nookies throws the shift himself: he pulls the lever in the car, the
+  pull runs up a control rope, over a guide pulley and onto the bellcrank on
+  the yoke axle. A plain circular dial is one menu click away for anyone who
+  wants the boring version.
 
 ## Quick start
 

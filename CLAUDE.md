@@ -31,6 +31,12 @@ back here before syncing again or the change is lost.
   re-anchors the car so reversing never teleports it.
   `web/src/ui/gauge.ts` is the alternative plain dial. Both satisfy
   `SpeedVisual`.
+- The gear shift is choreographed, not eased: `shiftT` runs 0→1 on its own
+  clock over `SHIFT_MS` and `STAGE` slices it into hand / lever / rope / yoke /
+  release. Reordering or un-overlapping those stages is what makes it stop
+  reading as one movement. `CRANK_BASE` is solved at module load so the rope
+  pulls straight at the hub in the upload seat; that is where the throw is
+  largest, so do not replace it with a hand-picked angle.
 - `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.
   Stylesheets must only ever read those tokens, never hard-code a colour.
 

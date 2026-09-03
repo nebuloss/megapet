@@ -18,6 +18,13 @@ import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from './v
  * That is a lathe tumbler reverse, and it is the whole reason the car can run
  * one way for download and the other for upload without anything jumping: the
  * gear train changes, not the arithmetic.
+ *
+ * Nookies throws the shift himself, and the linkage is drawn end to end. He
+ * pulls the lever in the car; the lever's short end takes up a control rope;
+ * the rope runs down the car's outrigger, up the shaft, over a guide pulley
+ * and onto a bellcrank on the yoke axle. Pulling it swings the yoke. The
+ * stages overlap slightly so the throw reads as one movement travelling
+ * through the machine rather than four things happening in turn.
  */
 
 const DIAL = { x: 140, y: 100, radius: 68, width: 10, ringRadius: 77, labelRadius: 88 };
@@ -54,13 +61,57 @@ const CAR_BOTTOM = CAR.top + TRAVEL;
 const WEIGHT = { w: 20, h: 38, x: DRUM.x + DRUM.r, low: 300 };
 const SHAFT = { x: 74, y: 200, w: 118, h: 172 };
 
+/** Where Nookies sits in the car, and how far his waving arm reaches. */
+const NOOKIE = { x: CAR.x, y: 30, scale: 0.55 };
+const ARM_SHOULDER = { x: -11, y: 4 };
+const ARM_REST = { x: -12, y: -9 }; // shoulder → hand, in Nookies' own frame
+const ARM_LENGTH = Math.hypot(ARM_REST.x, ARM_REST.y);
+
+/** The lever Nookies throws, in car-local coordinates. */
+const LEVER = { x: 102, y: 18, handle: 10, pin: 6, seatUp: -20, seatDown: 20 };
+
+/** Guide pulley the control rope turns over on its way to the gearbox. */
+const PULLEY = { x: 79, y: 122, r: 5.5 };
+
+/**
+ * The bellcrank on the yoke axle that the rope pulls. Its seat is solved so
+ * that at YOKE_UP the rope runs straight at the hub centre, which is where
+ * rotating the crank changes the rope length fastest — 31.7 units of throw
+ * between the two seats, rather than the 4 a badly placed crank would give.
+ */
+const CRANK_R = 30;
+const CRANK_BASE = ((): { x: number; y: number } => {
+  const dx = PULLEY.x - HUB.x;
+  const dy = PULLEY.y - HUB.y;
+  const len = Math.hypot(dx, dy);
+  const aimed = { x: (dx / len) * CRANK_R, y: (dy / len) * CRANK_R };
+  const a = (YOKE_UP * Math.PI) / 180;
+  // Undo the yoke rotation to express the pin in the yoke's own frame.
+  return {
+    x: aimed.x * Math.cos(a) + aimed.y * Math.sin(a),
+    y: -aimed.x * Math.sin(a) + aimed.y * Math.cos(a),
+  };
+})();
+
+/** How long a full shift takes, and when each stage of it runs. */
+const SHIFT_MS = 1150;
+const STAGE = {
+  reach: [0.0, 0.18],
+  lever: [0.16, 0.44],
+  rope: [0.28, 0.66],
+  yoke: [0.5, 0.84],
+  release: [0.8, 1.0],
+} as const;
+
+/** Length of the highlight that travels up the rope, in path units. */
+const PULSE_LENGTH = 16;
+
 const NEEDLE_LENGTH = 58;
 const ARC_LENGTH = 2 * Math.PI * DIAL.radius * (SWEEP / 360);
 const RING_LENGTH = 2 * Math.PI * DIAL.ringRadius * (SWEEP / 360);
 
-/** Time constants of the easing, in ms. Frame-rate independent. */
+/** Time constant of the value easing, in ms. Frame-rate independent. */
 const EASE_TAU = 110;
-const YOKE_TAU = 90;
 
 const ACCENTS: Record<GaugeAccent, string> = {
   primary: 'var(--md-sys-color-primary)',
@@ -72,6 +123,26 @@ let instanceCount = 0;
 
 function clamp(value: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, value));
+}
+
+function lerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
+}
+
+/** Progress of one stage of the shift, given overall progress. */
+function stage(t: number, [from, to]: readonly [number, number]): number {
+  return clamp((t - from) / (to - from), 0, 1);
+}
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+/** Overshoots slightly, so the lever lands with a mechanical snap. */
+function easeOutBack(t: number): number {
+  // Kept low deliberately: a bigger overshoot swings the handle into Nookies.
+  const c = 1.4;
+  return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2;
 }
 
 function polar(radius: number, degrees: number): [number, number] {
@@ -169,6 +240,10 @@ export class LiftScene implements SpeedVisual {
   private readonly carCable: SVGLineElement;
   private readonly weightCable: SVGLineElement;
   private readonly yoke: SVGGElement;
+  private readonly lever: SVGGElement;
+  private readonly rope: SVGPathElement;
+  private readonly ropePulse: SVGPathElement;
+  private readonly waveArm: SVGGElement;
   private readonly hubSpin: SVGGElement;
   private readonly swingSpin: SVGGElement;
   private readonly reverseSpin: SVGGElement;
@@ -179,12 +254,22 @@ export class LiftScene implements SpeedVisual {
   private readonly unitEl: HTMLElement;
   private readonly phaseEl: HTMLElement;
 
-  /** Eased state. Everything drawn is derived from these three numbers. */
+  /** Eased reading, in Mbps. The dial and the whole gear train follow it. */
   private shown = 0;
-  private yokeAngle = YOKE_UP;
-
   private target = 0;
-  private yokeTarget = YOKE_UP;
+
+  /**
+   * Progress through a gear shift, 0..1. It runs on its own clock rather than
+   * easing toward a value, because the stages have to arrive in order: hand,
+   * lever, rope, yoke.
+   */
+  private shiftT = 1;
+  private yokeAngle = YOKE_UP;
+  private leverAngle = LEVER.seatUp;
+  private shiftFromYoke = YOKE_UP;
+  private shiftToYoke = YOKE_UP;
+  private shiftFromLever = LEVER.seatUp;
+  private shiftToLever = LEVER.seatUp;
 
   /** Where the car sat when the current direction was selected. */
   private anchor = CAR.top;
@@ -203,6 +288,7 @@ export class LiftScene implements SpeedVisual {
     this.root = document.createElement('figure');
     this.root.className = 'lift';
     this.root.dataset.drive = 'up';
+    this.root.dataset.shifting = 'false';
 
     const stage = document.createElement('div');
     stage.className = 'lift__stage';
@@ -215,6 +301,10 @@ export class LiftScene implements SpeedVisual {
     this.carCable = this.svg.querySelector('.lift__cable--car')!;
     this.weightCable = this.svg.querySelector('.lift__cable--weight')!;
     this.yoke = this.svg.querySelector('.lift__yoke')!;
+    this.lever = this.svg.querySelector('.lift__lever')!;
+    this.rope = this.svg.querySelector('.lift__rope')!;
+    this.ropePulse = this.svg.querySelector('.lift__rope-pulse')!;
+    this.waveArm = this.svg.querySelector('.nookie__arm--wave')!;
     this.hubSpin = this.svg.querySelector('.lift__gear--hub .lift__gear-spin')!;
     this.swingSpin = this.svg.querySelector('.lift__gear--swing .lift__gear-spin')!;
     this.reverseSpin = this.svg.querySelector('.lift__gear--reverse .lift__gear-spin')!;
@@ -318,9 +408,23 @@ export class LiftScene implements SpeedVisual {
     <rect class="lift__car-body" x="${CAR.x - CAR.w / 2}" y="5" width="${CAR.w}" height="${CAR.h - 5}" rx="8"/>
     <rect class="lift__car-window" x="${CAR.x - CAR.w / 2 + 7}" y="11" width="${CAR.w - 14}" height="34" rx="6"/>
     <path class="lift__car-lamp" d="M${CAR.x - 4} 13h8"/>
-    <g transform="translate(${CAR.x} 30) scale(0.55)">${nookieMarkup()}</g>
+    <path class="lift__bracket" d="M${CAR.x - CAR.w / 2} 14H${PULLEY.x}"/>
+    <circle class="lift__lever-mount" cx="${LEVER.x}" cy="${LEVER.y}" r="2.6"/>
+    <g class="lift__lever" transform="rotate(${LEVER.seatUp} ${LEVER.x} ${LEVER.y})">
+      <path class="lift__lever-tail" d="M${LEVER.x} ${LEVER.y}V${LEVER.y - LEVER.pin}"/>
+      <circle class="lift__lever-pin" cx="${LEVER.x}" cy="${LEVER.y - LEVER.pin}" r="1.8"/>
+      <path class="lift__lever-arm" d="M${LEVER.x} ${LEVER.y}V${LEVER.y + LEVER.handle}"/>
+      <circle class="lift__lever-knob" cx="${LEVER.x}" cy="${LEVER.y + LEVER.handle}" r="2.7"/>
+    </g>
+    <g transform="translate(${NOOKIE.x} ${NOOKIE.y}) scale(${NOOKIE.scale})">${nookieMarkup()}</g>
     <path class="lift__car-floor" d="M${CAR.x - CAR.w / 2 + 5} 48h${CAR.w - 10}"/>
   </g>
+
+  <!-- control rope: lever → car outrigger → guide pulley → bellcrank -->
+  <path class="lift__rope"/>
+  <path class="lift__rope-pulse"/>
+  <circle class="lift__pulley" cx="${PULLEY.x}" cy="${PULLEY.y}" r="${PULLEY.r}"/>
+  <circle class="lift__pulley-hub" cx="${PULLEY.x}" cy="${PULLEY.y}" r="1.8"/>
 
   <!-- reversing gear: fixed, always meshed with the drum -->
   ${gearMarkup('reverse', REVERSE, `<circle class="lift__gear-hub" r="3.8"/>`)}
@@ -328,6 +432,8 @@ export class LiftScene implements SpeedVisual {
   <!-- the yoke that rocks the swing gear between the drum and the reverse gear -->
   <g class="lift__yoke" transform="rotate(${YOKE_UP} ${HUB.x} ${HUB.y})">
     <path class="lift__yoke-arm" d="M${HUB.x} ${HUB.y}V${HUB.y + SWING.arm}"/>
+    <path class="lift__crank-arm" d="M${HUB.x} ${HUB.y}L${(HUB.x + CRANK_BASE.x).toFixed(2)} ${(HUB.y + CRANK_BASE.y).toFixed(2)}"/>
+    <circle class="lift__crank-pin" cx="${(HUB.x + CRANK_BASE.x).toFixed(2)}" cy="${(HUB.y + CRANK_BASE.y).toFixed(2)}" r="3.2"/>
     ${gearMarkup('swing', { x: HUB.x, y: HUB.y + SWING.arm, ...SWING }, `<circle class="lift__gear-hub" r="4"/>`)}
   </g>
 
@@ -345,7 +451,6 @@ export class LiftScene implements SpeedVisual {
     this.target = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
     if (this.reducedMotion.matches) {
       this.shown = this.target;
-      this.yokeAngle = this.yokeTarget;
       this.paint();
       return;
     }
@@ -370,15 +475,34 @@ export class LiftScene implements SpeedVisual {
     // starts travelling the other way.
     this.anchor = this.carTopFor(toFraction(this.target));
     this.driveSign = sign;
-    this.yokeTarget = direction === 'down' ? YOKE_DOWN : YOKE_UP;
     this.root.dataset.drive = direction;
 
+    const yokeSeat = direction === 'down' ? YOKE_DOWN : YOKE_UP;
+    const leverSeat = direction === 'down' ? LEVER.seatDown : LEVER.seatUp;
+
     if (this.reducedMotion.matches) {
-      this.yokeAngle = this.yokeTarget;
+      this.seat(yokeSeat, leverSeat);
       this.paint();
       return;
     }
+    // Interrupting a shift picks up from wherever the linkage currently is.
+    this.shiftFromYoke = this.yokeAngle;
+    this.shiftFromLever = this.leverAngle;
+    this.shiftToYoke = yokeSeat;
+    this.shiftToLever = leverSeat;
+    this.shiftT = 0;
+    this.root.dataset.shifting = 'true';
     this.startLoop();
+  }
+
+  /** Puts the linkage straight into a seat, with no choreography. */
+  private seat(yokeSeat: number, leverSeat: number): void {
+    this.shiftT = 1;
+    this.yokeAngle = yokeSeat;
+    this.leverAngle = leverSeat;
+    this.shiftFromYoke = this.shiftToYoke = yokeSeat;
+    this.shiftFromLever = this.shiftToLever = leverSeat;
+    this.root.dataset.shifting = 'false';
   }
 
   reset(): void {
@@ -387,10 +511,9 @@ export class LiftScene implements SpeedVisual {
     this.reading = null;
     this.anchor = CAR.top;
     this.driveSign = -1;
-    this.yokeTarget = YOKE_UP;
     this.root.dataset.drive = 'up';
+    this.seat(YOKE_UP, LEVER.seatUp);
     this.setProgress(0);
-    if (this.reducedMotion.matches) this.yokeAngle = YOKE_UP;
     this.startLoop();
     this.paint();
   }
@@ -447,14 +570,14 @@ export class LiftScene implements SpeedVisual {
       const valueDelta = this.target - this.shown;
       this.shown += valueDelta * (1 - Math.exp(-dt / EASE_TAU));
 
-      const yokeDelta = this.yokeTarget - this.yokeAngle;
-      this.yokeAngle += yokeDelta * (1 - Math.exp(-dt / YOKE_TAU));
-
-      const settled = Math.abs(valueDelta) < 0.005 && Math.abs(yokeDelta) < 0.05;
-      if (settled) {
-        this.shown = this.target;
-        this.yokeAngle = this.yokeTarget;
+      // The shift runs to a fixed schedule so its stages keep their order.
+      if (this.shiftT < 1) {
+        this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);
+        if (this.shiftT === 1) this.root.dataset.shifting = 'false';
       }
+
+      const settled = Math.abs(valueDelta) < 0.005 && this.shiftT === 1;
+      if (settled) this.shown = this.target;
       this.paint();
 
       if (settled) {
@@ -466,8 +589,77 @@ export class LiftScene implements SpeedVisual {
     this.frame = requestAnimationFrame(step);
   }
 
+  /** Absolute position of the bellcrank pin for a yoke angle. */
+  private crankPin(yokeDeg: number): { x: number; y: number } {
+    const a = (yokeDeg * Math.PI) / 180;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    return {
+      x: HUB.x + CRANK_BASE.x * c - CRANK_BASE.y * s,
+      y: HUB.y + CRANK_BASE.x * s + CRANK_BASE.y * c,
+    };
+  }
+
+  /** The control rope, drawn end to end from the lever to the bellcrank. */
+  private ropeShape(carTop: number, leverDeg: number, yokeDeg: number): string {
+    const a = (leverDeg * Math.PI) / 180;
+    // The rope is taken up by the short end of the lever, opposite the handle.
+    const pinX = LEVER.x + LEVER.pin * Math.sin(a);
+    const pinY = carTop + LEVER.y - LEVER.pin * Math.cos(a);
+    const crank = this.crankPin(yokeDeg);
+    return (
+      `M ${pinX.toFixed(2)} ${pinY.toFixed(2)}` +
+      ` L 89 ${(carTop + 9).toFixed(2)}` +
+      ` L ${CAR.x - CAR.w / 2} ${(carTop + 14).toFixed(2)}` +
+      ` L ${PULLEY.x} ${(carTop + 14).toFixed(2)}` +
+      ` L ${PULLEY.x} ${PULLEY.y}` +
+      ` L ${crank.x.toFixed(2)} ${crank.y.toFixed(2)}`
+    );
+  }
+
+  /**
+   * Points Nookies' waving arm at the lever handle while he has hold of it.
+   * The arm stretches a little to close the gap, which is the oldest trick in
+   * character animation and completely invisible at this size.
+   */
+  private armShape(leverDeg: number, grip: number): string {
+    const a = (leverDeg * Math.PI) / 180;
+    const tipX = LEVER.x - LEVER.handle * Math.sin(a);
+    const tipY = LEVER.y + LEVER.handle * Math.cos(a);
+    const toHandle = {
+      x: (tipX - NOOKIE.x) / NOOKIE.scale - ARM_SHOULDER.x,
+      y: (tipY - NOOKIE.y) / NOOKIE.scale - ARM_SHOULDER.y,
+    };
+    const cross = ARM_REST.x * toHandle.y - ARM_REST.y * toHandle.x;
+    const dot = ARM_REST.x * toHandle.x + ARM_REST.y * toHandle.y;
+    const deg = (Math.atan2(cross, dot) * 180) / Math.PI;
+    const stretch = clamp(Math.hypot(toHandle.x, toHandle.y) / ARM_LENGTH, 1, 1.35);
+    return `rotate(${(deg * grip).toFixed(2)}) scale(${lerp(1, stretch, grip).toFixed(3)})`;
+  }
+
   private paint(): void {
     const fraction = toFraction(this.shown);
+
+    // --- the shift: hand, then lever, then rope, then yoke ---
+    const shift = this.shiftT;
+    this.leverAngle = lerp(
+      this.shiftFromLever,
+      this.shiftToLever,
+      easeOutBack(stage(shift, STAGE.lever)),
+    );
+    this.yokeAngle = lerp(
+      this.shiftFromYoke,
+      this.shiftToYoke,
+      easeInOut(stage(shift, STAGE.yoke)),
+    );
+    const grip =
+      easeInOut(stage(shift, STAGE.reach)) * (1 - easeInOut(stage(shift, STAGE.release)));
+
+    this.lever.setAttribute(
+      'transform',
+      `rotate(${this.leverAngle.toFixed(2)} ${LEVER.x} ${LEVER.y})`,
+    );
+    this.waveArm.style.transform = grip > 0.002 ? this.armShape(this.leverAngle, grip) : '';
 
     // The needle angle is the single input. Every gear ratio below is exact,
     // and the cable payout that positions the car is the same number again.
@@ -495,6 +687,26 @@ export class LiftScene implements SpeedVisual {
     this.weightCable.setAttribute('y2', weightTop.toFixed(2));
 
     this.valueArc.setAttribute('stroke-dashoffset', String(ARC_LENGTH * (1 - fraction)));
+
+    // The rope is redrawn from the two moving ends, so it stays connected
+    // wherever the car and the yoke happen to be.
+    const ropeD = this.ropeShape(carTop, this.leverAngle, this.yokeAngle);
+    this.rope.setAttribute('d', ropeD);
+
+    const pull = stage(shift, STAGE.rope);
+    if (pull > 0 && pull < 1) {
+      // A single dash sent along the rope: the pull travelling to the gearbox.
+      const total = this.rope.getTotalLength();
+      this.ropePulse.setAttribute('d', ropeD);
+      this.ropePulse.setAttribute('stroke-dasharray', `${PULSE_LENGTH} ${total.toFixed(1)}`);
+      this.ropePulse.setAttribute(
+        'stroke-dashoffset',
+        (PULSE_LENGTH - easeInOut(pull) * (total + PULSE_LENGTH)).toFixed(1),
+      );
+      this.ropePulse.style.opacity = Math.sin(Math.PI * pull).toFixed(3);
+    } else {
+      this.ropePulse.style.opacity = '0';
+    }
 
     this.root.style.setProperty('--lift-effort', fraction.toFixed(3));
     this.root.style.setProperty('--nookie-bob', `${(2.6 - fraction * 1.8).toFixed(2)}s`);

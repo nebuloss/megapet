@@ -864,6 +864,63 @@
   stroke-linecap: round;
 }
 
+/* --- the shifter linkage Nookies throws --- */
+
+.lift__lever-mount,
+.lift__pulley {
+  fill: var(--md-sys-color-surface-container-highest);
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.2;
+}
+
+.lift__lever-arm,
+.lift__lever-tail,
+.lift__crank-arm {
+  fill: none;
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.lift__lever-knob,
+.lift__crank-pin {
+  fill: var(--md-sys-color-error);
+  stroke: none;
+}
+
+.lift__lever-pin,
+.lift__pulley-hub {
+  fill: var(--md-sys-color-outline);
+}
+
+.lift__bracket {
+  fill: none;
+  stroke: var(--md-sys-color-outline-variant);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Thin and dashed, so the control rope never reads as a hoist cable. */
+.lift__rope {
+  fill: none;
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.3;
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+}
+
+/* One bright dash travelling the rope: the pull reaching the gearbox. */
+.lift__rope-pulse {
+  fill: none;
+  stroke: var(--md-sys-color-error);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
 /* --- shaft --- */
 
 .lift__shaft-fill {
@@ -1034,6 +1091,13 @@
 
 .lift[data-active='true'] .nookie__arm--wave {
   animation: nookie-wave calc(var(--nookie-bob) / 2) ease-in-out infinite;
+}
+
+/* While he is throwing the lever the arm is posed from script, and a CSS
+   animation would win the cascade over the inline transform. */
+.lift[data-shifting='true'] .nookie__arm--wave,
+.lift[data-shifting='true'] .nookie {
+  animation: none;
 }
 
 @keyframes nookie-bob {

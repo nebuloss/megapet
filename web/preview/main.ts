@@ -219,9 +219,10 @@ root.append(
     el('header', { class: 'preview__head' },
       el('h1', {}, 'Nookies lift'),
       el('p', {},
-        'The needle and the lift are one machine. A yoke rocks the swing gear between ' +
-        'the drum and the reversing gear, so download sends Nookies down the shaft and ' +
-        'upload winds him back up. Drag the slider, or reverse the gear by hand.'),
+        'The needle and the lift are one machine. To change direction Nookies throws ' +
+        'the lever in the car; the pull runs down the rope, over the guide pulley and ' +
+        'onto the bellcrank, and the yoke rocks the swing gear across. Press ' +
+        '“Reverse the gear” and watch the throw travel through the linkage.'),
     ),
     themeRow,
     el('div', { class: 'preview__stage' },
