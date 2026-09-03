@@ -1,0 +1,53 @@
+{
+  "listen": ":8080",
+  "base_url": "https://speedtest.internal.example",
+  "trusted_proxies": ["10.0.0.0/8", "192.168.0.0/16", "127.0.0.1/32"],
+
+  "test": {
+    "ping_count": 12,
+    "ping_warmup": 2,
+    "download_seconds": 10,
+    "upload_seconds": 10,
+    "grace_seconds": 1.5,
+    "download_streams": 6,
+    "upload_streams": 4,
+    "upload_chunk_bytes": 8388608,
+    "overhead_factor": 1.0
+  },
+
+  "limits": {
+    "max_bytes_per_request": 68719476736,
+    "max_streams_per_ip": 16,
+    "max_streams_total": 256
+  },
+
+  "store": {
+    "enabled": true,
+    "path": "/var/lib/speedtest/speedtest.db",
+    "retention_days": 365,
+    "record_ip": true,
+    "anonymize_ip": false
+  },
+
+  "ipinfo": {
+    "enabled": false,
+    "provider": "ipapi",
+    "token": "",
+    "timeout_ms": 2500,
+    "cache_ttl_ms": 21600000
+  },
+
+  "ui": {
+    "title": "Speedtest",
+    "seed_color": "#4F6BED",
+    "show_history": true,
+    "auto_start": false
+  },
+
+  "servers": [],
+
+  "metrics": {
+    "enabled": true,
+    "path": "/metrics"
+  }
+}

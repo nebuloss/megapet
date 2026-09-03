@@ -1,0 +1,45 @@
+[Unit]
+Description=Speedtest server
+Documentation=https://github.com/nebuloss/speedtest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=speedtest
+Group=speedtest
+ExecStart=/usr/local/bin/speedtestd -config /etc/speedtest/speedtest.json
+Restart=on-failure
+RestartSec=2s
+
+# The database lives here; systemd creates it with the right ownership.
+StateDirectory=speedtest
+WorkingDirectory=/var/lib/speedtest
+
+# A speedtest server is a large, unauthenticated bandwidth source. Give it as
+# little of the host as it can run with.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+
+# Saturating a fast link needs plenty of sockets.
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

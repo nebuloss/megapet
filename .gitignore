@@ -1,0 +1,11 @@
+/dist/
+/speedtestd
+/internal/server/webdist/*
+!/internal/server/webdist/.gitkeep
+/web/node_modules/
+/web/dist/
+/web/preview-dist/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store

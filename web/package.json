@@ -1,0 +1,21 @@
+{
+  "name": "speedtest-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "build:preview": "vite build --config vite.preview.config.ts"
+  },
+  "dependencies": {
+    "@material/material-color-utilities": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2"
+  }
+}

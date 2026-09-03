@@ -1,0 +1,70 @@
+/* Material 3 design tokens.
+ *
+ * Colour roles (--md-sys-color-*) are generated at runtime from the seed colour
+ * by theme.ts, so they are deliberately absent here — the values below are the
+ * parts of the system that do not depend on the palette. */
+
+:root {
+  /* Typescale. Roboto is the M3 reference face; the stack degrades to the
+     platform UI font rather than shipping a webfont over the LAN. */
+  --md-ref-font: 'Roboto', 'Segoe UI Variable', 'Segoe UI', system-ui,
+    -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --md-ref-font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono',
+    Menlo, Consolas, monospace;
+
+  --md-sys-typescale-display-large: 400 3.5625rem/4rem var(--md-ref-font);
+  --md-sys-typescale-display-medium: 400 2.8125rem/3.25rem var(--md-ref-font);
+  --md-sys-typescale-display-small: 400 2.25rem/2.75rem var(--md-ref-font);
+  --md-sys-typescale-headline-large: 400 2rem/2.5rem var(--md-ref-font);
+  --md-sys-typescale-headline-medium: 400 1.75rem/2.25rem var(--md-ref-font);
+  --md-sys-typescale-headline-small: 400 1.5rem/2rem var(--md-ref-font);
+  --md-sys-typescale-title-large: 400 1.375rem/1.75rem var(--md-ref-font);
+  --md-sys-typescale-title-medium: 500 1rem/1.5rem var(--md-ref-font);
+  --md-sys-typescale-title-small: 500 0.875rem/1.25rem var(--md-ref-font);
+  --md-sys-typescale-body-large: 400 1rem/1.5rem var(--md-ref-font);
+  --md-sys-typescale-body-medium: 400 0.875rem/1.25rem var(--md-ref-font);
+  --md-sys-typescale-body-small: 400 0.75rem/1rem var(--md-ref-font);
+  --md-sys-typescale-label-large: 500 0.875rem/1.25rem var(--md-ref-font);
+  --md-sys-typescale-label-medium: 500 0.75rem/1rem var(--md-ref-font);
+  --md-sys-typescale-label-small: 500 0.6875rem/1rem var(--md-ref-font);
+
+  /* Shape */
+  --md-sys-shape-corner-none: 0;
+  --md-sys-shape-corner-xs: 4px;
+  --md-sys-shape-corner-sm: 8px;
+  --md-sys-shape-corner-md: 12px;
+  --md-sys-shape-corner-lg: 16px;
+  --md-sys-shape-corner-xl: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* Motion */
+  --md-sys-motion-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-sys-motion-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-duration-short: 200ms;
+  --md-sys-motion-duration-medium: 300ms;
+  --md-sys-motion-duration-long: 500ms;
+
+  /* State layer opacities */
+  --md-sys-state-hover: 0.08;
+  --md-sys-state-focus: 0.1;
+  --md-sys-state-pressed: 0.1;
+
+  /* Elevation */
+  --md-sys-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.12);
+  --md-sys-elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.12);
+  --md-sys-elevation-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.12);
+
+  /* Layout */
+  --page-max: 68rem;
+  --page-gutter: clamp(1rem, 4vw, 2rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --md-sys-motion-duration-short: 1ms;
+    --md-sys-motion-duration-medium: 1ms;
+    --md-sys-motion-duration-long: 1ms;
+  }
+}
