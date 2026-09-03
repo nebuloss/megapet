@@ -6,7 +6,7 @@ VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 
 LDFLAGS     := -s -w -X github.com/nebuloss/megapet/internal/server.Version=$(VERSION)
 GOFLAGS     := -trimpath
 
-.PHONY: help all build backend web web-deps dev dev-api preview run \
+.PHONY: help all build backend web web-deps dev dev-api preview run dist-all \
         tidy fmt fmt-check vet test test-go test-web typecheck check verify clean
 
 ## help: list the targets worth knowing about
@@ -51,6 +51,33 @@ preview:
 ## run: build, then start the binary
 run: build
 	$(DIST)/$(BINARY)
+
+# Every target here is CGO-free, so cross-compiling needs no toolchains.
+PLATFORMS ?= linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 freebsd/amd64 windows/amd64
+
+## dist-all: cross-compile every platform into dist/, with archives and checksums
+dist-all: web
+	@rm -rf $(DIST) && mkdir -p $(DIST)
+	@set -e; for platform in $(PLATFORMS); do \
+		os=$${platform%%/*}; arch=$${platform##*/}; \
+		name=megapet_$(VERSION)_$${os}_$${arch}; \
+		bin=$(BINARY); if [ "$$os" = windows ]; then bin=$(BINARY).exe; fi; \
+		stage=$(DIST)/$$name; mkdir -p $$stage; \
+		echo "building $$os/$$arch"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch GOARM=7 \
+			go build $(GOFLAGS) -ldflags '$(LDFLAGS)' -o $$stage/$$bin $(CMD); \
+		cp LICENSE README.md CHANGELOG.md $$stage/; \
+		cp configs/megapet.example.json $$stage/; \
+		cp -r deploy $$stage/deploy; \
+		if [ "$$os" = windows ]; then \
+			(cd $(DIST) && zip -qr $$name.zip $$name); \
+		else \
+			tar -czf $(DIST)/$$name.tar.gz -C $(DIST) $$name; \
+		fi; \
+		rm -rf $$stage; \
+	done
+	@cd $(DIST) && sha256sum megapet_* > megapet_$(VERSION)_checksums.txt
+	@echo; ls -1 $(DIST)
 
 tidy:
 	go mod tidy

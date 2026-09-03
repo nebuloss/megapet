@@ -1,5 +1,15 @@
 # Deploying
 
+The quickest route is the install script, which handles the user, config and
+unit for you:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/nebuloss/megapet/main/scripts/install.sh | sh -s -- --systemd
+```
+
+The rest of this page is the manual equivalent.
+
+## By hand
 Copy `dist/megapetd` to `/usr/local/bin`, [the example config](../configs/megapet.example.json) to
 `/etc/megapet/megapet.json`, and install the unit:
 

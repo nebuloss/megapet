@@ -25,7 +25,23 @@ in time with your connection.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## Quick start
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/nebuloss/megapet/main/scripts/install.sh | sh
+```
+
+Detects your platform, verifies the download's SHA-256 against the published
+checksums, and installs `megapetd` to `/usr/local/bin`. Add `--systemd` to
+create the service user, config and unit as well; `--uninstall` reverses it.
+It only escalates where it has to, so `--prefix "$HOME/.local"` installs
+without root at all.
+
+Prebuilt binaries are published for **linux** (amd64, arm64, armv7), **macOS**
+(amd64, arm64), **FreeBSD** (amd64) and **Windows** (amd64) — see
+[Releases](https://github.com/nebuloss/megapet/releases).
+
+## Build from source
 
 ```sh
 make web-deps      # npm ci in web/
@@ -34,7 +50,8 @@ make build         # -> dist/megapetd
 ```
 
 Then open <http://localhost:8080>. Building needs **Go 1.25+** and **Node
-20.19+**; the resulting binary needs neither.
+20.19+**; the resulting binary needs neither. `make dist-all` cross-compiles
+every published platform, with archives and checksums.
 
 ## Why this instead of LibreSpeed
 

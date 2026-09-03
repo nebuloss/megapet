@@ -1,0 +1,94 @@
+name: Release
+
+# Publishing is driven entirely by tags: push v1.2.3 and the release appears.
+# A tag containing a hyphen (v1.2.3-rc1) is published as a pre-release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build a release for'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so `git describe` can stamp the version.
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: make web-deps
+
+      # Never publish something that does not pass its own checks.
+      - name: Verify
+        run: make verify
+
+      # The frontend is built once and embedded into every binary, so all
+      # platforms ship byte-identical assets.
+      - name: Cross-compile
+        run: make dist-all
+
+      - name: Resolve the version
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ -n "${{ github.event.inputs.tag }}" ]; then tag="${{ github.event.inputs.tag }}"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          case "$tag" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+                          *)  echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+
+      - name: Extract the changelog entry
+        id: notes
+        run: |
+          version="${{ steps.version.outputs.tag }}"
+          version="${version#v}"
+          # Pull just this version's section out of CHANGELOG.md, if it has one.
+          awk -v v="$version" '
+            $0 ~ "^## \\[?" v "\\]?" {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            echo "have_notes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_notes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Uses the pre-installed gh CLI rather than a third-party action, so the
+      # release step pulls in no code beyond what GitHub already ships.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args="--title ${{ steps.version.outputs.tag }}"
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
+            args="$args --prerelease"
+          fi
+          if [ "${{ steps.notes.outputs.have_notes }}" = "true" ]; then
+            args="$args --notes-file notes.md"
+          else
+            args="$args --generate-notes"
+          fi
+          # shellcheck disable=SC2086
+          gh release create "${{ steps.version.outputs.tag }}" $args \
+            dist/megapet_*.tar.gz dist/megapet_*.zip dist/megapet_*_checksums.txt

@@ -1,12 +1,15 @@
 # Changelog
 
-Notable changes, newest first. This project has not had a tagged release yet;
-everything below is on `main`.
+Notable changes, newest first.
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com), and
-versions will follow [Semantic Versioning](https://semver.org) once tagged.
+versions follow [Semantic Versioning](https://semver.org).
 
 ## Unreleased
+
+## 1.0.0 — 2026-09-03
+
+First public release.
 
 ### Added
 
@@ -39,3 +42,14 @@ versions will follow [Semantic Versioning](https://semver.org) once tagged.
   knowledge of the speedtest.
 - A deliberate pause between phases so the direction change can be watched,
   its length asked for by whichever visual is mounted.
+- Cross-compiled releases for linux (amd64, arm64, armv7), macOS (amd64,
+  arm64), FreeBSD (amd64) and Windows (amd64), published automatically on a
+  version tag. The frontend is built once and embedded into every binary, so
+  all platforms ship byte-identical assets.
+- `scripts/install.sh`: detects the platform, verifies the archive's SHA-256
+  against the published checksums, and installs with `--systemd` and
+  `--uninstall` options. Escalates only where it has to.
+- A frontend layered by responsibility — `core`, `api`, `domain`, `theme`,
+  `routing`, and `ui` split into primitives, components, features and
+  visuals — with the transfer phases as a Template Method hierarchy and the
+  hero visuals behind a Strategy interface and factory.
