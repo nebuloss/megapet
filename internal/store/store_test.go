@@ -26,7 +26,7 @@ func TestSaveAndGet(t *testing.T) {
 		DownloadMbps: 942.31, UploadMbps: 918.4,
 		PingMs: 0.42, JitterMs: 0.08, PingMinMs: 0.39, PingMaxMs: 0.91,
 		DownloadBytes: 1_178_000_000, UploadBytes: 1_148_000_000,
-		ClientIP: "10.0.50.20", ISP: "Private network", ServerName: "This server",
+		ClientIP: "10.9.9.20", ISP: "Private network", ServerName: "This server",
 	}
 	if err := db.Save(ctx, &in); err != nil {
 		t.Fatalf("Save: %v", err)

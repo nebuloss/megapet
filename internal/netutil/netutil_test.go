@@ -39,35 +39,35 @@ func TestClientIP(t *testing.T) {
 		{
 			name:    "trusted peer forwarding a single client",
 			trusted: []string{"10.0.0.0/8"},
-			remote:  "10.0.50.1:5555",
+			remote:  "10.9.9.1:5555",
 			headers: map[string][]string{"X-Forwarded-For": {"198.51.100.9"}},
 			want:    "198.51.100.9",
 		},
 		{
 			name:    "chain of trusted proxies resolves to the closest untrusted hop",
 			trusted: []string{"10.0.0.0/8"},
-			remote:  "10.0.50.1:5555",
-			headers: map[string][]string{"X-Forwarded-For": {"198.51.100.9, 10.0.50.9, 10.0.50.1"}},
+			remote:  "10.9.9.1:5555",
+			headers: map[string][]string{"X-Forwarded-For": {"198.51.100.9, 10.9.9.9, 10.9.9.1"}},
 			want:    "198.51.100.9",
 		},
 		{
 			name:    "spoofed leading entry cannot outrank the real hop",
 			trusted: []string{"10.0.0.0/8"},
-			remote:  "10.0.50.1:5555",
+			remote:  "10.9.9.1:5555",
 			headers: map[string][]string{"X-Forwarded-For": {"1.2.3.4, 198.51.100.9"}},
 			want:    "198.51.100.9",
 		},
 		{
 			name:    "x-real-ip used when no forwarded-for is present",
 			trusted: []string{"10.0.0.0/8"},
-			remote:  "10.0.50.1:5555",
+			remote:  "10.9.9.1:5555",
 			headers: map[string][]string{"X-Real-IP": {"198.51.100.9"}},
 			want:    "198.51.100.9",
 		},
 		{
 			name:    "bare trusted address is treated as a single host",
-			trusted: []string{"10.0.50.1"},
-			remote:  "10.0.50.1:5555",
+			trusted: []string{"10.9.9.1"},
+			remote:  "10.9.9.1:5555",
 			headers: map[string][]string{"X-Forwarded-For": {"198.51.100.9"}},
 			want:    "198.51.100.9",
 		},
@@ -107,7 +107,7 @@ func TestNewResolverRejectsGarbage(t *testing.T) {
 func TestAnonymize(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"203.0.113.7", "203.0.113.0"},
-		{"10.0.50.20", "10.0.50.0"},
+		{"10.9.9.20", "10.9.9.0"},
 		{"2001:db8:1:2:3:4:5:6", "2001:db8:1::"},
 	}
 	for _, tc := range tests {
@@ -119,7 +119,7 @@ func TestAnonymize(t *testing.T) {
 }
 
 func TestIsPrivate(t *testing.T) {
-	private := []string{"10.0.50.20", "192.168.1.1", "172.16.0.1", "127.0.0.1", "fd00::1", "::1"}
+	private := []string{"10.9.9.20", "192.168.1.1", "172.16.0.1", "127.0.0.1", "fd00::1", "::1"}
 	public := []string{"203.0.113.7", "8.8.8.8", "2001:db8::1"}
 
 	for _, s := range private {

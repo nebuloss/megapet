@@ -1,7 +1,14 @@
 {
   "name": "megapet-web",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
+  "description": "Frontend for Megapet, a self-hosted network speedtest.",
+  "license": "MIT",
+  "author": "nebuloss",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nebuloss/megapet.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

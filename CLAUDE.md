@@ -5,23 +5,27 @@ binary (the SPA is embedded with `go:embed` from `internal/server/webdist`).
 
 ## Building
 
-Never build on this machine. Mirror the tree to the build host and build there:
+Do not build on the development machine — it is source-only. Mirror the tree
+to the build host and build there:
 
 ```sh
-./sync-to-build.sh
-ssh guillaume@10.0.50.21 'cd ~/build/megapet && rtk make check && rtk make build'
+BUILD_HOST=... ./scripts/sync-to-build.sh
+ssh "$BUILD_HOST" 'cd ~/build/megapet && rtk make check && rtk make build'
 ```
 
-`npm ci` works with the stock npm on dev-build, but **regenerating**
-`package-lock.json` needs a newer one — npm 9.2.0 fails with "Cannot read
-properties of null (reading 'edgesOut')". Use `npx --yes npm@10 install
---package-lock-only`, then copy the lockfile back here before the next sync.
+The build host for this project is recorded in memory, not here, because this
+file is public.
 
-`go.mod` and `go.sum` are part of the source tree. `sync-to-build.sh` uses
-`rsync --delete`, so after running `go mod tidy` on the build host, copy them
-back here before syncing again or the change is lost.
+`npm ci` works with an older npm, but **regenerating** `package-lock.json`
+needs npm 10+ — npm 9.2.0 fails with "Cannot read properties of null (reading
+'edgesOut')". Use `npx --yes npm@10 install --package-lock-only`, then copy the
+lockfile back before the next sync.
 
-## Layout
+`go.mod` and `go.sum` are part of the source tree. `scripts/sync-to-build.sh`
+uses `rsync --delete`, so after running `go mod tidy` on the build host, copy
+them back here before syncing again or the change is lost.
+
+## Invariants worth knowing
 
 - `internal/speed` — the measurement endpoints. Changes here affect reported
   numbers; keep the no-store / identity-encoding headers intact.
@@ -29,11 +33,10 @@ back here before syncing again or the change is lost.
   the post-grace window are what make the figures honest; do not "simplify" the
   meter into a naive total-bytes-over-total-time calculation.
 - `web/src/mech` — a standalone mechanics library: plane geometry, spur gears,
-  the tumbler reverse, rope bookkeeping, springs and detents, plus the SVG path
-  generation for all of them. It knows nothing about the speedtest and is
-  covered by unit tests (`npm test` in `web/`). Ratios here are tooth counts,
-  never radii, and every gear is cut to one module — mixing modules is what
-  makes teeth stop lining up.
+  belt drives, rope, springs and detents, plus the SVG path generation for all
+  of them. It knows nothing about the speedtest and is covered by unit tests
+  (`npm test` in `web/`). Ratios here are tooth counts, never radii, and every
+  gear is cut to one module — mixing modules is what makes teeth stop lining up.
 - `web/src/ui/lift` — the hero visual. The needle drives one gear pair that
   never leaves mesh, and that drives the sheave through a belt; crossing the
   belt is what reverses the lift. Do not reintroduce a gear that swings in and
@@ -48,5 +51,14 @@ back here before syncing again or the change is lost.
 - `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.
   Stylesheets must only ever read those tokens, never hard-code a colour.
 
-`npm --prefix web run build:preview` renders a standalone playground for the
-visuals with no backend running.
+## Commands
+
+- `make check` — format in place, vet, both test suites, tsc. Use while working.
+- `make verify` — the same, read-only. This is what CI runs.
+- `make preview` — standalone playground for the visuals, no backend needed.
+
+## Public repository
+
+This repo is public, so nothing in the tree may contain internal hostnames,
+addresses or credentials. `scripts/sync-to-build.sh` deliberately has no
+default host and exits if `BUILD_HOST` is unset.

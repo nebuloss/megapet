@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: make web-deps
+
+      # gofmt, go vet, both test suites and tsc, without rewriting anything.
+      - name: Verify
+        run: make verify
+
+      - name: Build
+        run: make build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: megapetd-linux-amd64
+          path: dist/megapetd
+          if-no-files-found: error
