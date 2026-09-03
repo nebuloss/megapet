@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { approach } from '../../primitives/anim';
 import { toFraction } from '../scale';
 import { carriageTop, type CarriageInput } from './carriage';
-import { CAR, CAR_BOTTOM, EASE_TAU, HOME_MS, LAND_MS, SHIFT_MS, TRAVEL } from './layout';
+import {
+  CAR,
+  CAR_BOTTOM,
+  EASE_TAU,
+  HOME_MS,
+  LAND_MS,
+  RETURN_MS,
+  SHIFT_MS,
+  TRAVEL,
+} from './layout';
 
 const FRAME_MS = 16;
 
@@ -230,6 +239,14 @@ describe('carriageTop', () => {
     const before = m.top;
     hold(m, 0, SHIFT_MS - FRAME_MS);
     expect(m.top).toBe(before);
+  });
+
+  it('holds the car for at least as long as the needle takes to fall', () => {
+    // The needle turns the sheave through the belt, so a return sweep that
+    // outlasts the machine's hold on the car would drag it back up the shaft.
+    // Between phases the hold is the landing plus the whole belt shift; at a
+    // reset it is the homing glide, which is started with RETURN_MS by name.
+    expect(LAND_MS + SHIFT_MS).toBeGreaterThanOrEqual(RETURN_MS);
   });
 
   it('stays within the shaft', () => {

@@ -267,6 +267,12 @@ export class LiftVisual implements SpeedVisual {
     this.startGlide(floor, LAND_MS);
   }
 
+  settleMs(): number {
+    const home = this.glideT < 1 ? (1 - this.glideT) * this.glideMs : 0;
+    const swing = this.returnT < 1 ? (1 - this.returnT) * RETURN_MS : 0;
+    return Math.round(Math.max(home, swing));
+  }
+
   /** Hands the car to the machine for a scripted move; the belt has no say. */
   private startGlide(to: number, ms: number): void {
     this.glideFrom = this.carTop;
@@ -310,10 +316,15 @@ export class LiftVisual implements SpeedVisual {
       this.carTop = CAR.top;
       this.glideT = 1;
     } else {
-      // The reading eases to zero on its own; the car is driven home over the
-      // same window, so neither of them jumps.
-      this.startGlide(CAR.top, HOME_MS);
-      this.glideT = 0; // home even if it is already there, so the run opens level
+      if (this.shownFraction > 0) {
+        // The needle's fall to the stop turns the sheave through the belt, so
+        // the machine holds the car for exactly as long as the fall lasts —
+        // even when the car is already home and has nowhere to go.
+        this.startGlide(CAR.top, RETURN_MS);
+        this.glideT = 0;
+      } else {
+        this.startGlide(CAR.top, HOME_MS);
+      }
     }
     this.pendingDrive = null;
     this.shiftT = 1;

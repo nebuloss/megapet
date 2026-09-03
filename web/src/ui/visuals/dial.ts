@@ -121,6 +121,14 @@ export class DialVisual implements SpeedVisual {
   /** Nothing travels on a plain dial, so there is nothing to bring to a stop. */
   land(): void {}
 
+  /**
+   * Nothing worth waiting for: a frame here is one arc attribute and one text
+   * node, which will not show up in a ping.
+   */
+  settleMs(): number {
+    return 0;
+  }
+
   setPosition(mbps: number): void {
     this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     this.startAnimation();

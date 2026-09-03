@@ -66,11 +66,16 @@ export class SpeedTest {
    * worth watching with nothing else moving — so the reading is allowed to
    * settle, the machine is reversed, and only then does the next phase start
    * loading the link.
+   *
+   * `openingMs` is the same idea at the front, for the opposite reason: the
+   * visual's opening move gets the main thread to itself so it cannot land in
+   * the middle of the latency probes.
    */
   constructor(
     private readonly params: TestParams,
     private readonly base = '',
     private readonly reverseMs = 0,
+    private readonly openingMs = 0,
   ) {}
 
   get isRunning(): boolean {
@@ -103,6 +108,10 @@ export class SpeedTest {
 
       // ---- latency -------------------------------------------------------
       emit({ phase: 'latency', progress: 0, liveMbps: 0 });
+      // A ping on a local link is a millisecond or two, small enough that one
+      // janked frame outweighs the thing being measured. So the visual's
+      // opening move is allowed to finish before the first probe goes out.
+      if (this.openingMs > 0) await sleep(this.openingMs, signal);
       const latency: LatencyResult = await measureLatency({
         base: this.base,
         count: this.params.ping_count,

@@ -87,7 +87,13 @@ export class TestController {
     setRunning(true);
 
     const base = peer ? this.deps.api.withBase(peer.url) : this.deps.api;
-    this.test = new SpeedTest(this.deps.params, base.url(''), target.transitionMs);
+    // settleMs() is asked after reset(), so it reports the move reset started.
+    this.test = new SpeedTest(
+      this.deps.params,
+      base.url(''),
+      target.transitionMs,
+      target.settleMs(),
+    );
 
     let lastPhase: Phase = 'idle';
     const snapshot = await this.test.run((s) => {

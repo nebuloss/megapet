@@ -41,6 +41,15 @@ export interface SpeedVisual extends View {
   land(): void;
   /** Returns to the resting state before a new run. */
   reset(): void;
+  /**
+   * How long to leave the main thread alone before measuring latency, in ms.
+   *
+   * Called straight after `reset`. A ping on a local link is a millisecond or
+   * two, so a frame that janks is worth more than the measurement itself. A
+   * visual with an opening move to play asks for it to finish first; one that
+   * barely touches the DOM asks for nothing.
+   */
+  settleMs(): number;
   /** 0..1 elapsed fraction of the current phase. */
   setProgress(fraction: number): void;
   setAccent(accent: GaugeAccent): void;
