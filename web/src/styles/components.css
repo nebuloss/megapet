@@ -815,10 +815,31 @@
   stroke-linejoin: round;
 }
 
-/* Tinting the idler differently makes the direction reversal at each mesh
-   legible: adjacent wheels are never the same colour. */
-.lift__gear--idler .lift__gear-body {
+/* Tinting alternate wheels makes the direction reversal at each mesh legible:
+   two gears in mesh are never the same colour. */
+.lift__gear--swing .lift__gear-body {
   fill: color-mix(in srgb, var(--lift-accent) 45%, var(--md-sys-color-surface-container-highest));
+}
+
+.lift__gear--reverse .lift__gear-body {
+  fill: color-mix(in srgb, var(--lift-accent) 60%, var(--md-sys-color-surface-container-highest));
+}
+
+/* The reversing gear only carries load while the yoke is rocked onto it. */
+.lift__gear--reverse {
+  transition: opacity var(--md-sys-motion-duration-medium) var(--md-sys-motion-standard);
+}
+
+.lift[data-drive='up'] .lift__gear--reverse {
+  opacity: 0.38;
+}
+
+.lift__yoke-arm {
+  fill: none;
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 7;
+  stroke-linecap: round;
+  opacity: 0.55;
 }
 
 .lift__gear--drum .lift__gear-body {
@@ -868,17 +889,15 @@
   fill: var(--md-sys-color-surface-container);
 }
 
-/* Floor marks sit at the same fractions as the dial labels, so a needle on
-   100 puts the car level with the 100 floor. */
+/* Evenly spaced floors. They are structure, not a second scale — the numbers
+   live on the dial, which is the one thing that reads the same in either
+   direction of travel. */
 .lift__floor {
   stroke: var(--md-sys-color-outline-variant);
-  stroke-width: 1.6;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 5;
   stroke-linecap: round;
-}
-
-.lift__floor-label {
-  fill: var(--md-sys-color-on-surface-variant);
-  font: var(--md-sys-typescale-label-small);
+  opacity: 0.7;
 }
 
 /* --- cable, car, counterweight --- */
@@ -929,12 +948,18 @@
   animation: lift-streak var(--streak-duration) linear infinite;
 }
 
+/* Streaks run with the car, so the same keyframes played backwards cover the
+   upward direction. */
+.lift[data-drive='up'] .lift__streak {
+  animation-direction: reverse;
+}
+
 @keyframes lift-streak {
   from {
     transform: translateY(0);
   }
   to {
-    transform: translateY(215px);
+    transform: translateY(200px);
   }
 }
 

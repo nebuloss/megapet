@@ -1,16 +1,23 @@
 import { icon, type IconName } from './icons';
 import { TICKS, toFraction } from './scale';
-import { readoutText, type GaugeAccent, type SpeedVisual } from './visual';
+import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
 
 /*
- * The speed dial and the lift are one machine.
+ * The speed dial and the lift are one machine, with a reversing gear between
+ * them.
  *
- * The needle sits on the hub gear. That gear meshes with an idler, the idler
- * meshes with the drum, and the drum winds the cable that carries the car. So
- * the car's height is not an animation played alongside the reading — it is
- * derived from the needle angle through the gear train, and the floor marks in
- * the shaft line up with the decades on the dial. Move the needle and the lift
- * has to follow.
+ * The needle rides the hub gear. A swing gear on a pivoting yoke always meshes
+ * the hub, and the yoke rocks between two seats:
+ *
+ *   download — the swing gear meets the reverse gear, which meets the drum.
+ *              Three meshes, so the drum turns anticlockwise and pays cable
+ *              out: the car descends as the download figure climbs.
+ *   upload   — the swing gear meets the drum directly. Two meshes, the drum
+ *              turns clockwise and winds cable in: the car climbs.
+ *
+ * That is a lathe tumbler reverse, and it is the whole reason the car can run
+ * one way for download and the other for upload without anything jumping: the
+ * gear train changes, not the arithmetic.
  */
 
 const DIAL = { x: 140, y: 100, radius: 68, width: 10, ringRadius: 77, labelRadius: 88 };
@@ -18,28 +25,42 @@ const START_ANGLE = 225;
 const SWEEP = 270;
 const SWEEP_RAD = (SWEEP * Math.PI) / 180;
 
-/** Hub (needle), idler, drum. Each pair is mounted at the sum of its radii. */
+/** Hub carries the needle; the drum winds the cable. */
 const HUB = { x: DIAL.x, y: DIAL.y, r: 19, teeth: 13, depth: 6 };
-const IDLER = { x: DIAL.x, y: DIAL.y + 30, r: 11, teeth: 8, depth: 5 };
-const DRUM = { x: DIAL.x, y: DIAL.y + 67, r: 26, teeth: 15, depth: 7 };
+const DRUM = { x: DIAL.x, y: 166, r: 26, teeth: 15, depth: 7 };
+
+/** The reverse gear is fixed and permanently meshed with the drum. */
+const REVERSE = { x: 170, y: 142.68, r: 12, teeth: 8, depth: 5 };
 
 /**
- * One turn of the needle pays out `hub radius × angle` of cable: the idler only
- * reverses direction, so it cancels out of the ratio entirely. That identity is
- * why the travel below is exactly HUB.r × SWEEP_RAD.
+ * The swing gear rides a yoke pivoting on the hub axis, so it stays meshed with
+ * the hub at every yoke angle. The two seat angles were solved from the mesh
+ * distances: at YOKE_UP it sits `SWING.r + DRUM.r` from the drum, at
+ * YOKE_DOWN it sits `SWING.r + REVERSE.r` from the reverse gear.
+ */
+const SWING = { r: 13, teeth: 9, depth: 5, arm: 32 };
+const YOKE_UP = 23.99; // direct drive: hub → swing → drum
+const YOKE_DOWN = -55.94; // reverse engaged: hub → swing → reverse → drum
+
+/**
+ * One turn of the needle pays out `hub radius × angle` of cable: the gears
+ * between only set direction, so their sizes cancel out of the ratio. That
+ * identity is why the travel below is exactly HUB.r × SWEEP_RAD.
  */
 const TRAVEL = HUB.r * SWEEP_RAD;
 
-const CAR = { w: 60, h: 56, x: DRUM.x - DRUM.r, topLow: 302 };
-const WEIGHT = { w: 20, h: 38, x: DRUM.x + DRUM.r, topHigh: 208 };
-const SHAFT = { x: 74, y: 196, w: 118, h: 178 };
+const CAR = { w: 60, h: 56, x: DRUM.x - DRUM.r, top: 212 };
+const CAR_BOTTOM = CAR.top + TRAVEL;
+const WEIGHT = { w: 20, h: 38, x: DRUM.x + DRUM.r, low: 300 };
+const SHAFT = { x: 74, y: 200, w: 118, h: 172 };
 
 const NEEDLE_LENGTH = 58;
 const ARC_LENGTH = 2 * Math.PI * DIAL.radius * (SWEEP / 360);
 const RING_LENGTH = 2 * Math.PI * DIAL.ringRadius * (SWEEP / 360);
 
-/** Time constant of the value easing, in ms. Frame-rate independent. */
+/** Time constants of the easing, in ms. Frame-rate independent. */
 const EASE_TAU = 110;
+const YOKE_TAU = 90;
 
 const ACCENTS: Record<GaugeAccent, string> = {
   primary: 'var(--md-sys-color-primary)',
@@ -48,6 +69,10 @@ const ACCENTS: Record<GaugeAccent, string> = {
 };
 
 let instanceCount = 0;
+
+function clamp(value: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, value));
+}
 
 function polar(radius: number, degrees: number): [number, number] {
   const rad = ((degrees - 90) * Math.PI) / 180;
@@ -122,14 +147,14 @@ function nookieMarkup(): string {
 function gearMarkup(
   name: string,
   g: { x: number; y: number; r: number; teeth: number; depth: number },
-  inner: string,
+  inner = '',
 ): string {
-  const spokeReach = (g.r - g.depth / 2 - 3).toFixed(1);
+  const reach = (g.r - g.depth / 2 - 2.5).toFixed(1);
   return `
   <g class="lift__gear lift__gear--${name}" transform="translate(${g.x} ${g.y})">
     <g class="lift__gear-spin">
       <path class="lift__gear-body" d="${gearPath(g.r, g.teeth, g.depth)}"/>
-      <path class="lift__gear-spoke" d="M0 -${spokeReach}V${spokeReach}M-${spokeReach} 0H${spokeReach}"/>
+      <path class="lift__gear-spoke" d="M0 -${reach}V${reach}M-${reach} 0H${reach}"/>
       ${inner}
     </g>
   </g>`;
@@ -143,8 +168,10 @@ export class LiftScene implements SpeedVisual {
   private readonly weightGroup: SVGGElement;
   private readonly carCable: SVGLineElement;
   private readonly weightCable: SVGLineElement;
+  private readonly yoke: SVGGElement;
   private readonly hubSpin: SVGGElement;
-  private readonly idlerSpin: SVGGElement;
+  private readonly swingSpin: SVGGElement;
+  private readonly reverseSpin: SVGGElement;
   private readonly drumSpin: SVGGElement;
   private readonly valueArc: SVGPathElement;
   private readonly ringArc: SVGPathElement;
@@ -152,12 +179,21 @@ export class LiftScene implements SpeedVisual {
   private readonly unitEl: HTMLElement;
   private readonly phaseEl: HTMLElement;
 
+  /** Eased state. Everything drawn is derived from these three numbers. */
   private shown = 0;
+  private yokeAngle = YOKE_UP;
+
   private target = 0;
+  private yokeTarget = YOKE_UP;
+
+  /** Where the car sat when the current direction was selected. */
+  private anchor = CAR.top;
+  private driveSign = -1; // -1 climbs, +1 descends
   private reading: number | null = null;
+  private unit = 'Mbps';
+
   private frame = 0;
   private lastFrameAt = 0;
-  private unit = 'Mbps';
 
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -166,6 +202,7 @@ export class LiftScene implements SpeedVisual {
 
     this.root = document.createElement('figure');
     this.root.className = 'lift';
+    this.root.dataset.drive = 'up';
 
     const stage = document.createElement('div');
     stage.className = 'lift__stage';
@@ -177,8 +214,10 @@ export class LiftScene implements SpeedVisual {
     this.weightGroup = this.svg.querySelector('.lift__weight')!;
     this.carCable = this.svg.querySelector('.lift__cable--car')!;
     this.weightCable = this.svg.querySelector('.lift__cable--weight')!;
+    this.yoke = this.svg.querySelector('.lift__yoke')!;
     this.hubSpin = this.svg.querySelector('.lift__gear--hub .lift__gear-spin')!;
-    this.idlerSpin = this.svg.querySelector('.lift__gear--idler .lift__gear-spin')!;
+    this.swingSpin = this.svg.querySelector('.lift__gear--swing .lift__gear-spin')!;
+    this.reverseSpin = this.svg.querySelector('.lift__gear--reverse .lift__gear-spin')!;
     this.drumSpin = this.svg.querySelector('.lift__gear--drum .lift__gear-spin')!;
     this.valueArc = this.svg.querySelector('.lift__dial-value')!;
     this.ringArc = this.svg.querySelector('.lift__progress-ring')!;
@@ -204,8 +243,6 @@ export class LiftScene implements SpeedVisual {
   }
 
   private markup(clipId: string): string {
-    // Dial labels and shaft floor marks are placed from the same fraction, so a
-    // needle pointing at 100 puts the car exactly on the 100 floor.
     const dialTicks = TICKS.map(([value, label]) => {
       const angle = START_ANGLE + toFraction(value) * SWEEP;
       const [x1, y1] = polar(DIAL.radius - DIAL.width / 2 - 3, angle);
@@ -217,13 +254,14 @@ export class LiftScene implements SpeedVisual {
       );
     }).join('');
 
-    const floors = TICKS.map(([value, label]) => {
-      const y = this.carTopFor(toFraction(value)) + CAR.h / 2;
-      return (
-        `<line class="lift__floor" x1="${SHAFT.x + SHAFT.w + 4}" y1="${y.toFixed(1)}" x2="${SHAFT.x + SHAFT.w + 12}" y2="${y.toFixed(1)}"/>` +
-        `<text class="lift__floor-label" x="${SHAFT.x + SHAFT.w + 16}" y="${(y + 3.2).toFixed(1)}">${label}</text>`
-      );
-    }).join('');
+    // Evenly spaced floors: structure, not a second scale. The numbers live on
+    // the dial, which is the only thing that reads the same in both directions.
+    const floors = [1, 2, 3, 4, 5]
+      .map((k) => {
+        const y = (SHAFT.y + (SHAFT.h * k) / 6).toFixed(1);
+        return `<line class="lift__floor" x1="${SHAFT.x + 6}" y1="${y}" x2="${SHAFT.x + SHAFT.w - 6}" y2="${y}"/>`;
+      })
+      .join('');
 
     const streaks = [86, 100, 128, 176]
       .map(
@@ -233,8 +271,8 @@ export class LiftScene implements SpeedVisual {
       .join('');
 
     return `
-<svg viewBox="0 0 280 390" class="lift__svg" role="img"
-     aria-label="A speed dial geared to a lift: the needle drives the gear train that winds Nookies the bear up the shaft">
+<svg viewBox="0 0 280 384" class="lift__svg" role="img"
+     aria-label="A speed dial geared to a lift: a reversing gear sends Nookies the bear down the shaft while downloading and back up while uploading">
   <defs>
     <clipPath id="${clipId}">
       <rect x="${SHAFT.x + 2}" y="${SHAFT.y + 2}" width="${SHAFT.w - 4}" height="${SHAFT.h - 4}" rx="10"/>
@@ -255,26 +293,26 @@ export class LiftScene implements SpeedVisual {
   <rect class="lift__shaft-fill" x="${SHAFT.x}" y="${SHAFT.y}" width="${SHAFT.w}" height="${SHAFT.h}" rx="12"/>
   <g clip-path="url(#${clipId})">
     <g class="lift__streaks">${streaks}</g>
+    ${floors}
     <path class="lift__rail" d="M82 ${SHAFT.y + 6}V${SHAFT.y + SHAFT.h - 6}M184 ${SHAFT.y + 6}V${SHAFT.y + SHAFT.h - 6}"/>
     <path class="lift__pit" d="M${SHAFT.x} ${SHAFT.y + SHAFT.h - 14}h${SHAFT.w}v14h-${SHAFT.w}z"/>
   </g>
   <rect class="lift__shaft-frame" x="${SHAFT.x}" y="${SHAFT.y}" width="${SHAFT.w}" height="${SHAFT.h}" rx="12"/>
-  ${floors}
 
   <!-- drum, then the cable it winds -->
   ${gearMarkup('drum', DRUM, `<circle class="lift__gear-hub" r="6"/><path class="lift__drum-groove" d="M0 -${DRUM.r - 5}A${DRUM.r - 5} ${DRUM.r - 5} 0 0 1 0 ${DRUM.r - 5}"/>`)}
   <path class="lift__cable" d="M${CAR.x} ${DRUM.y} A ${DRUM.r} ${DRUM.r} 0 0 1 ${WEIGHT.x} ${DRUM.y}"/>
-  <line class="lift__cable lift__cable--car" x1="${CAR.x}" y1="${DRUM.y}" x2="${CAR.x}" y2="${CAR.topLow}"/>
-  <line class="lift__cable lift__cable--weight" x1="${WEIGHT.x}" y1="${DRUM.y}" x2="${WEIGHT.x}" y2="${WEIGHT.topHigh}"/>
+  <line class="lift__cable lift__cable--car" x1="${CAR.x}" y1="${DRUM.y}" x2="${CAR.x}" y2="${CAR.top}"/>
+  <line class="lift__cable lift__cable--weight" x1="${WEIGHT.x}" y1="${DRUM.y}" x2="${WEIGHT.x}" y2="${WEIGHT.low}"/>
 
   <!-- counterweight -->
-  <g class="lift__weight" transform="translate(0 ${WEIGHT.topHigh})">
+  <g class="lift__weight" transform="translate(0 ${WEIGHT.low})">
     <rect class="lift__weight-body" x="${WEIGHT.x - WEIGHT.w / 2}" y="0" width="${WEIGHT.w}" height="${WEIGHT.h}" rx="3"/>
     <path class="lift__weight-plates" d="M${WEIGHT.x - 6} 10h12M${WEIGHT.x - 6} 19h12M${WEIGHT.x - 6} 28h12"/>
   </g>
 
   <!-- car -->
-  <g class="lift__car" transform="translate(0 ${CAR.topLow})">
+  <g class="lift__car" transform="translate(0 ${CAR.top})">
     <path class="lift__hook" d="M${CAR.x} -6v6M${CAR.x - 6} 0h12"/>
     <rect class="lift__car-roof" x="${CAR.x - CAR.w / 2 - 3}" y="0" width="${CAR.w + 6}" height="6" rx="3"/>
     <rect class="lift__car-body" x="${CAR.x - CAR.w / 2}" y="5" width="${CAR.w}" height="${CAR.h - 5}" rx="8"/>
@@ -284,8 +322,16 @@ export class LiftScene implements SpeedVisual {
     <path class="lift__car-floor" d="M${CAR.x - CAR.w / 2 + 5} 48h${CAR.w - 10}"/>
   </g>
 
-  <!-- idler, then the needle on the hub gear -->
-  ${gearMarkup('idler', IDLER, `<circle class="lift__gear-hub" r="3.6"/>`)}
+  <!-- reversing gear: fixed, always meshed with the drum -->
+  ${gearMarkup('reverse', REVERSE, `<circle class="lift__gear-hub" r="3.8"/>`)}
+
+  <!-- the yoke that rocks the swing gear between the drum and the reverse gear -->
+  <g class="lift__yoke" transform="rotate(${YOKE_UP} ${HUB.x} ${HUB.y})">
+    <path class="lift__yoke-arm" d="M${HUB.x} ${HUB.y}V${HUB.y + SWING.arm}"/>
+    ${gearMarkup('swing', { x: HUB.x, y: HUB.y + SWING.arm, ...SWING }, `<circle class="lift__gear-hub" r="4"/>`)}
+  </g>
+
+  <!-- the needle, on the hub gear that drives all of it -->
   ${gearMarkup(
     'hub',
     HUB,
@@ -295,14 +341,11 @@ export class LiftScene implements SpeedVisual {
 </svg>`;
   }
 
-  private carTopFor(fraction: number): number {
-    return CAR.topLow - fraction * TRAVEL;
-  }
-
   setPosition(mbps: number): void {
     this.target = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
     if (this.reducedMotion.matches) {
       this.shown = this.target;
+      this.yokeAngle = this.yokeTarget;
       this.paint();
       return;
     }
@@ -318,14 +361,45 @@ export class LiftScene implements SpeedVisual {
     this.paint();
   }
 
-  snap(): void {
-    this.shown = this.target;
+  setDrive(direction: Drive): void {
+    const sign = direction === 'down' ? 1 : -1;
+    if (sign === this.driveSign) return;
+
+    // Re-anchor on the car's current target. The next phase starts from a
+    // reading of zero, so the car does not move when the gear shifts — it just
+    // starts travelling the other way.
+    this.anchor = this.carTopFor(toFraction(this.target));
+    this.driveSign = sign;
+    this.yokeTarget = direction === 'down' ? YOKE_DOWN : YOKE_UP;
+    this.root.dataset.drive = direction;
+
+    if (this.reducedMotion.matches) {
+      this.yokeAngle = this.yokeTarget;
+      this.paint();
+      return;
+    }
+    this.startLoop();
+  }
+
+  reset(): void {
+    this.target = 0;
+    this.shown = 0;
+    this.reading = null;
+    this.anchor = CAR.top;
+    this.driveSign = -1;
+    this.yokeTarget = YOKE_UP;
+    this.root.dataset.drive = 'up';
+    this.setProgress(0);
+    if (this.reducedMotion.matches) this.yokeAngle = YOKE_UP;
+    this.startLoop();
     this.paint();
   }
 
   setProgress(fraction: number): void {
-    const clamped = Math.min(1, Math.max(0, fraction));
-    this.ringArc.setAttribute('stroke-dashoffset', String(RING_LENGTH * (1 - clamped)));
+    this.ringArc.setAttribute(
+      'stroke-dashoffset',
+      String(RING_LENGTH * (1 - clamp(fraction, 0, 1))),
+    );
   }
 
   setAccent(accent: GaugeAccent): void {
@@ -356,6 +430,11 @@ export class LiftScene implements SpeedVisual {
     this.frame = 0;
   }
 
+  /** Car position for a reading, measured from the anchor in the drive direction. */
+  private carTopFor(fraction: number): number {
+    return clamp(this.anchor + this.driveSign * fraction * TRAVEL, CAR.top, CAR_BOTTOM);
+  }
+
   private startLoop(): void {
     if (this.frame) return;
     this.lastFrameAt = 0;
@@ -365,11 +444,17 @@ export class LiftScene implements SpeedVisual {
 
       // Exponential approach expressed against elapsed time, so the motion is
       // identical on a 60 Hz and a 144 Hz display.
-      const delta = this.target - this.shown;
-      this.shown += delta * (1 - Math.exp(-dt / EASE_TAU));
+      const valueDelta = this.target - this.shown;
+      this.shown += valueDelta * (1 - Math.exp(-dt / EASE_TAU));
 
-      const settled = Math.abs(delta) < 0.005;
-      if (settled) this.shown = this.target;
+      const yokeDelta = this.yokeTarget - this.yokeAngle;
+      this.yokeAngle += yokeDelta * (1 - Math.exp(-dt / YOKE_TAU));
+
+      const settled = Math.abs(valueDelta) < 0.005 && Math.abs(yokeDelta) < 0.05;
+      if (settled) {
+        this.shown = this.target;
+        this.yokeAngle = this.yokeTarget;
+      }
       this.paint();
 
       if (settled) {
@@ -384,18 +469,26 @@ export class LiftScene implements SpeedVisual {
   private paint(): void {
     const fraction = toFraction(this.shown);
 
-    // Everything below is derived from this one angle. The needle, the three
-    // gears, the cable length and the car all move together or not at all.
+    // The needle angle is the single input. Every gear ratio below is exact,
+    // and the cable payout that positions the car is the same number again.
     const needleDeg = fraction * SWEEP;
-    const idlerDeg = -needleDeg * (HUB.r / IDLER.r);
-    const drumDeg = needleDeg * (HUB.r / DRUM.r);
+    const swingDeg = -needleDeg * (HUB.r / SWING.r);
+    // Descending pays cable out, which is the drum turning anticlockwise.
+    const drumDeg = -this.driveSign * needleDeg * (HUB.r / DRUM.r);
+    const reverseDeg = -drumDeg * (DRUM.r / REVERSE.r);
 
     this.hubSpin.setAttribute('transform', `rotate(${(START_ANGLE + needleDeg).toFixed(2)})`);
-    this.idlerSpin.setAttribute('transform', `rotate(${idlerDeg.toFixed(2)})`);
+    this.swingSpin.setAttribute('transform', `rotate(${swingDeg.toFixed(2)})`);
     this.drumSpin.setAttribute('transform', `rotate(${drumDeg.toFixed(2)})`);
+    this.reverseSpin.setAttribute('transform', `rotate(${reverseDeg.toFixed(2)})`);
+    this.yoke.setAttribute(
+      'transform',
+      `rotate(${this.yokeAngle.toFixed(2)} ${HUB.x} ${HUB.y})`,
+    );
 
     const carTop = this.carTopFor(fraction);
-    const weightTop = WEIGHT.topHigh + fraction * TRAVEL;
+    // The counterweight is on the other strand, so it mirrors the car exactly.
+    const weightTop = WEIGHT.low - (carTop - CAR.top);
     this.carGroup.setAttribute('transform', `translate(0 ${carTop.toFixed(2)})`);
     this.weightGroup.setAttribute('transform', `translate(0 ${weightTop.toFixed(2)})`);
     this.carCable.setAttribute('y2', carTop.toFixed(2));

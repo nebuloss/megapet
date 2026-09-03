@@ -1,6 +1,6 @@
 import { icon, type IconName } from './icons';
 import { TICKS, toFraction } from './scale';
-import { readoutText, type GaugeAccent, type SpeedVisual } from './visual';
+import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
 
 const CENTER = 100;
 const ARC_RADIUS = 74;
@@ -124,8 +124,16 @@ export class Gauge implements SpeedVisual {
     this.paint();
   }
 
-  snap(): void {
-    this.shown = this.target;
+  /** The dial has no direction of travel; the flag is exposed for CSS only. */
+  setDrive(direction: Drive): void {
+    this.root.dataset.drive = direction;
+  }
+
+  reset(): void {
+    this.target = 0;
+    this.shown = 0;
+    this.reading = null;
+    this.setProgress(0);
     this.paint();
   }
 

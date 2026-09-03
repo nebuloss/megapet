@@ -2,6 +2,9 @@ import type { IconName } from './icons';
 
 export type GaugeAccent = 'primary' | 'tertiary' | 'secondary';
 
+/** Which way the lift travels as the reading rises. */
+export type Drive = 'down' | 'up';
+
 /**
  * The contract the hero visual satisfies, so the dial and the lift scene are
  * interchangeable without the rest of the app knowing which one is mounted.
@@ -18,8 +21,14 @@ export interface SpeedVisual {
    * position again, which is what both throughput phases want.
    */
   setReading(value: number | null, unit: string): void;
-  /** Applies the pending position immediately, skipping the easing. */
-  snap(): void;
+  /**
+   * Selects the direction of travel for the phase about to start. The lift
+   * shifts its reversing gear and re-anchors where the car currently is, so
+   * changing direction never teleports it.
+   */
+  setDrive(direction: Drive): void;
+  /** Returns to the resting state before a new run. */
+  reset(): void;
   /** 0..1 elapsed fraction of the current phase. */
   setProgress(fraction: number): void;
   setAccent(accent: GaugeAccent): void;

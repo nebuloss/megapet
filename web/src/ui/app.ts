@@ -19,7 +19,7 @@ import { icon, sunIcon, type IconName } from './icons';
 import { LiftScene } from './liftscene';
 import { toast } from './snackbar';
 import { StatTiles } from './stats';
-import type { GaugeAccent, SpeedVisual } from './visual';
+import type { Drive, GaugeAccent, SpeedVisual } from './visual';
 
 type VisualKind = 'lift' | 'dial';
 
@@ -33,13 +33,26 @@ interface PhaseStyle {
   accent: GaugeAccent;
   unit: string;
   tile: 'download' | 'upload' | 'ping' | null;
+  /** Which way the lift travels while this phase runs. */
+  drive: Drive;
 }
 
 const PHASES: Record<Phase, PhaseStyle | null> = {
   idle: null,
-  latency: { label: 'Latency', icon: 'latency', accent: 'secondary', unit: 'ms', tile: 'ping' },
-  download: { label: 'Download', icon: 'download', accent: 'primary', unit: 'Mbps', tile: 'download' },
-  upload: { label: 'Upload', icon: 'upload', accent: 'tertiary', unit: 'Mbps', tile: 'upload' },
+  latency: {
+    label: 'Latency', icon: 'latency', accent: 'secondary',
+    unit: 'ms', tile: 'ping', drive: 'up',
+  },
+  // Bytes coming down the wire send the car down the shaft, and going back up
+  // for the upload phase is what the reversing gear is for.
+  download: {
+    label: 'Download', icon: 'download', accent: 'primary',
+    unit: 'Mbps', tile: 'download', drive: 'down',
+  },
+  upload: {
+    label: 'Upload', icon: 'upload', accent: 'tertiary',
+    unit: 'Mbps', tile: 'upload', drive: 'up',
+  },
   done: null,
   aborted: null,
   error: null,
@@ -389,8 +402,8 @@ export class App {
     this.running = true;
     this.stats.reset();
     clear(this.shareSlot);
+    this.visual.reset();
     this.visual.setActive(true);
-    this.visual.setProgress(0);
     this.setStartButton('stop');
 
     const base = this.peer ? normalizeBase(this.peer.url) : '';
@@ -434,6 +447,9 @@ export class App {
   private applyPhase(phase: Phase): void {
     const style = PHASES[phase];
     if (!style) return;
+    // Selected before the reading is applied, so the gear shift re-anchors on
+    // where the car actually is rather than moving it.
+    this.visual.setDrive(style.drive);
     this.visual.setAccent(style.accent);
     this.visual.setPhase(style.label, style.icon);
     this.visual.setReading(style.unit === 'ms' ? 0 : null, style.unit);

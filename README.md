@@ -29,12 +29,14 @@ result history.
   figure down. Overhead compensation exists but is off unless you ask for it.
 - **Material You.** The whole palette is generated at runtime from one seed
   colour, in light and dark, and the visitor can change it.
-- **Nookies.** The dial and the lift are one machine. The needle sits on a hub
-  gear that drives an idler, which drives the drum, which winds the cable that
-  raises the car — so the car's height is derived from the needle angle through
-  the gear train, not animated beside it, and the floor marks in the shaft line
-  up with the decades on the dial. A beige bear rides inside. A plain circular
-  dial is one menu click away for anyone who wants the boring version.
+- **Nookies.** The dial and the lift are one machine, with a reversing gear
+  between them. The needle rides the hub gear; a yoke rocks the swing gear
+  between the drum (two meshes, drum clockwise, car up) and a reversing gear
+  (three meshes, drum anticlockwise, car down). So downloads send the car
+  *down* the shaft and uploads wind it back *up*, and the car's travel is
+  derived from the needle angle through the train rather than animated beside
+  it. A beige bear rides inside. A plain circular dial is one menu click away
+  for anyone who wants the boring version.
 
 ## Quick start
 

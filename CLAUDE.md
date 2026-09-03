@@ -23,9 +23,12 @@ back here before syncing again or the change is lost.
 - `web/src/engine` — the browser-side measurement engine. `grace_seconds` and
   the post-grace window are what make the figures honest; do not "simplify" the
   meter into a naive total-bytes-over-total-time calculation.
-- `web/src/ui/liftscene.ts` — the default hero visual. The needle, the three
-  gears, the cable and the car are all derived from one angle in `paint()`;
-  keep them coupled rather than animating any of them independently.
+- `web/src/ui/liftscene.ts` — the default hero visual. The needle, all four
+  gears, the cable and the car are derived from one angle in `paint()`; keep
+  them coupled rather than animating any of them independently. The yoke seat
+  angles (`YOKE_UP`, `YOKE_DOWN`) are solved from the gear mesh distances — if
+  you move a gear, re-solve them or the teeth stop lining up. `setDrive()`
+  re-anchors the car so reversing never teleports it.
   `web/src/ui/gauge.ts` is the alternative plain dial. Both satisfy
   `SpeedVisual`.
 - `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.

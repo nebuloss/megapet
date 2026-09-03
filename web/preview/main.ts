@@ -18,7 +18,7 @@ import { icon, sunIcon } from '../src/ui/icons';
 import { hydrateRipples } from '../src/ui/dom';
 import { SEED_OPTIONS, initTheme, isDark, setMode, setSeed } from '../src/theme';
 import { formatMs, formatSpeed } from '../src/format';
-import type { GaugeAccent, SpeedVisual } from '../src/ui/visual';
+import type { Drive, GaugeAccent, SpeedVisual } from '../src/ui/visual';
 
 // A host page may have already stamped an explicit theme on the document;
 // honour it instead of falling back to the OS preference.
@@ -38,6 +38,10 @@ function sliderToMbps(position: number): number {
 }
 
 let simulation: number | undefined;
+
+function drive(direction: Drive): void {
+  for (const visual of visuals) visual.setDrive(direction);
+}
 
 function apply(value: number, accent: GaugeAccent = 'primary'): void {
   for (const visual of visuals) {
@@ -59,9 +63,15 @@ function stopSimulation(): void {
   for (const visual of visuals) visual.setActive(false);
 }
 
+function resetAll(): void {
+  stopSimulation();
+  for (const visual of visuals) visual.reset();
+  stats.reset();
+}
+
 /** Replays a plausible latency → download → upload run. */
 function simulate(): void {
-  stopSimulation();
+  resetAll();
   const start = performance.now();
   const target = 940;
   for (const visual of visuals) visual.setActive(true);
@@ -71,6 +81,7 @@ function simulate(): void {
 
     if (t < 2.5) {
       const rtt = 0.4 + Math.random() * 0.35;
+      drive('up');
       for (const visual of visuals) {
         visual.setAccent('secondary');
         visual.setPhase('Latency', 'latency');
@@ -86,6 +97,7 @@ function simulate(): void {
     if (t < 12.5) {
       const p = (t - 2.5) / 10;
       const value = target * (1 - Math.exp(-p * 4)) * (0.94 + Math.random() * 0.09);
+      drive('down');
       for (const visual of visuals) {
         visual.setPhase('Download', 'download');
         visual.setProgress(p);
@@ -98,6 +110,7 @@ function simulate(): void {
     if (t < 22.5) {
       const p = (t - 12.5) / 10;
       const value = target * 0.94 * (1 - Math.exp(-p * 4)) * (0.94 + Math.random() * 0.09);
+      drive('up');
       for (const visual of visuals) {
         visual.setPhase('Upload', 'upload');
         visual.setProgress(p);
@@ -125,10 +138,12 @@ const slider = el('input', {
   class: 'preview__slider',
   'aria-label': 'Simulated speed',
 }) as HTMLInputElement;
+let manualDrive: Drive = 'down';
+
 slider.addEventListener('input', () => {
   stopSimulation();
   for (const visual of visuals) visual.setActive(true);
-  apply(sliderToMbps(Number(slider.value)));
+  apply(sliderToMbps(Number(slider.value)), manualDrive === 'down' ? 'primary' : 'tertiary');
 });
 
 function button(label: string, onClick: () => void, cls = 'btn btn--tonal'): HTMLElement {
@@ -141,18 +156,29 @@ const presets = el(
   'div',
   { class: 'preview__row' },
   button('Simulate a full run', simulate, 'btn'),
-  button('Idle', () => {
-    stopSimulation();
+  button('Reset', () => {
     slider.value = '0';
+    manualDrive = 'down';
+    resetAll();
+    drive('down');
     for (const visual of visuals) visual.setPhase(null);
-    apply(0);
+  }),
+  button('Reverse the gear', () => {
+    stopSimulation();
+    manualDrive = manualDrive === 'down' ? 'up' : 'down';
+    drive(manualDrive);
+    for (const visual of visuals) {
+      visual.setPhase(manualDrive === 'down' ? 'Download' : 'Upload',
+        manualDrive === 'down' ? 'download' : 'upload');
+    }
+    apply(sliderToMbps(Number(slider.value)), manualDrive === 'down' ? 'primary' : 'tertiary');
   }),
   ...[10, 100, 940, 2500, 10000].map((v) =>
     button(`${v >= 1000 ? `${v / 1000} G` : `${v} M`}bps`, () => {
       stopSimulation();
       slider.value = String((Math.log10(1 + v) / Math.log10(10001)) * 1000);
       for (const visual of visuals) visual.setActive(true);
-      apply(v);
+      apply(v, manualDrive === 'down' ? 'primary' : 'tertiary');
     }),
   ),
 );
@@ -193,9 +219,9 @@ root.append(
     el('header', { class: 'preview__head' },
       el('h1', {}, 'Nookies lift'),
       el('p', {},
-        'The needle and the lift are one machine. The needle sits on the hub gear, ' +
-        'the hub drives the idler, the idler drives the drum, and the drum winds the ' +
-        'cable that lifts Nookies. Drag the slider and watch the whole chain move at once.'),
+        'The needle and the lift are one machine. A yoke rocks the swing gear between ' +
+        'the drum and the reversing gear, so download sends Nookies down the shaft and ' +
+        'upload winds him back up. Drag the slider, or reverse the gear by hand.'),
     ),
     themeRow,
     el('div', { class: 'preview__stage' },
@@ -215,4 +241,5 @@ root.append(
 );
 
 hydrateRipples(root);
+drive('down');
 apply(0);
