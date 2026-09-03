@@ -14,7 +14,18 @@ versions follow [Semantic Versioning](https://semver.org).
   go straight to the server. Derived from `listen` when not set explicitly,
   probed by the browser on load, and preferred automatically once it answers.
 - `tls`: serve https directly. Chiefly so the direct measurement path is usable
-  from an https page, which browsers otherwise block as mixed content.
+  from an https page, which browsers otherwise block as mixed content. The
+  certificate is re-read when it changes, so a renewal by certbot, Caddy or
+  Nginx Proxy Manager is picked up without a restart; a reload that fails
+  leaves the previous certificate serving rather than refusing connections.
+
+### Fixed
+
+- The example nginx config disabled gzip entirely, which cost every visitor
+  about 100 kB because the bundle was served uncompressed. Compression is back
+  on for the page and its assets; the measurement payloads are still never
+  touched, because the server marks them `Content-Encoding: identity` and nginx
+  skips any response that already declares an encoding.
 
 ## 1.0.0 — 2026-09-03
 

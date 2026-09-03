@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nebuloss/megapet/internal/certs"
 	"github.com/nebuloss/megapet/internal/config"
 	"github.com/nebuloss/megapet/internal/metrics"
 	"github.com/nebuloss/megapet/internal/netutil"
@@ -102,9 +104,23 @@ func run() error {
 		return err
 	}
 
+	// Read once now so a bad path fails at startup, and re-read on change so a
+	// renewal by certbot, Caddy or Nginx Proxy Manager is picked up without a
+	// restart.
+	var tlsConfig *tls.Config
+	if cfg.TLS.Enabled() {
+		reloader, err := certs.New(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+		if err != nil {
+			return err
+		}
+		tlsConfig = reloader.TLSConfig()
+		log.Info("serving TLS", "cert", cfg.TLS.CertFile)
+	}
+
 	httpSrv := &http.Server{
-		Addr:    cfg.Listen,
-		Handler: srv.Handler(),
+		Addr:      cfg.Listen,
+		Handler:   srv.Handler(),
+		TLSConfig: tlsConfig,
 		// No read or write timeout: a download stream is deliberately long
 		// lived. ReadHeaderTimeout still bounds slowloris-style header stalls.
 		ReadHeaderTimeout: 15 * time.Second,
@@ -123,7 +139,9 @@ func run() error {
 			"ipinfo", cfg.IPInfo.Enabled)
 		var err error
 		if cfg.TLS.Enabled() {
-			err = httpSrv.ListenAndServeTLS(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+			// The files were already validated above; the empty arguments tell
+			// net/http to take the certificate from the TLSConfig instead.
+			err = httpSrv.ListenAndServeTLS("", "")
 		} else {
 			err = httpSrv.ListenAndServe()
 		}

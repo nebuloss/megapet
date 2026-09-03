@@ -97,6 +97,13 @@ The certificate has to be one the browser already trusts — a self-signed one
 fails silently, exactly like mixed content. In practice that means a second
 hostname whose DNS points straight at the server rather than at the proxy.
 
+The files are re-read when they change, so a certificate renewed by certbot,
+Caddy or Nginx Proxy Manager is picked up without a restart. If a reload fails
+— a renewal caught mid-write, say — the previous certificate keeps being served
+rather than every connection being refused. See
+[Nginx Proxy Manager](deployment.md#nginx-proxy-manager) for sharing NPM's
+certificates.
+
 On a plain http LAN deployment none of this applies: enable `direct` and it
 works.
 

@@ -57,3 +57,45 @@ the proxy's address instead of the client's.
 Even correctly tuned, a proxy costs a hop. If you want the link measured rather
 than the front door, see
 [measuring past a reverse proxy](configuration.md#measuring-past-a-reverse-proxy).
+
+## Nginx Proxy Manager
+
+NPM is the common case where you do not control the nginx config file and the
+certificates belong to something else. Two things to know.
+
+**Downloads are already safe.** megapet sends `X-Accel-Buffering: no` on every
+measurement response, and nginx honours that per response regardless of
+`proxy_buffering`. You do not have to change anything for the download phase.
+
+**Uploads are not.** There is no header equivalent for `proxy_request_buffering`,
+so nginx will spool the whole upload body — hundreds of megabytes — before
+forwarding a byte of it. Open the proxy host, go to **Advanced → Custom Nginx
+Configuration**, and paste:
+
+```nginx
+proxy_request_buffering off;
+client_max_body_size 0;
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;
+```
+
+`client_max_body_size` matters as much as the buffering: the nginx default is
+1 MB, so without it the upload phase is rejected with a `413`.
+
+Also set `trusted_proxies` in megapet's own config to the address NPM connects
+from, or every result is recorded against NPM rather than the client.
+
+### If you want the direct measurement path as well
+
+With NPM terminating TLS, an https page cannot reach an `http://` direct
+address — browsers block it as mixed content, so megapet does not offer the
+option. Two ways round it:
+
+- **Share NPM's certificate.** NPM keeps its Let's Encrypt certificates under
+  its data volume, at `letsencrypt/live/npm-<id>/`. Point `tls.cert_file` and
+  `tls.key_file` at those and give megapet a hostname of its own whose DNS
+  points at the server rather than at NPM. megapet re-reads the files when they
+  change, so a renewal is picked up without a restart.
+- **Skip it.** With the snippet above, the only cost left is the proxy hop
+  itself, which is invisible below about a gigabit. The direct path is worth
+  the trouble mainly on faster links.
