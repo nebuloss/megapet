@@ -112,7 +112,6 @@ export function liftMarkup(clipId: string): string {
         stroke-dasharray="${RING_LENGTH.toFixed(2)} ${RING_LENGTH.toFixed(2)}"
         stroke-dashoffset="${RING_LENGTH.toFixed(2)}"/>
   ${dialTicks}
-  <text class="lift__dial-unit" x="${HUB.x}" y="${(HUB.y + 30).toFixed(1)}">${UNIT}</text>
 
   <rect class="lift__shaft-fill" x="${SHAFT.x}" y="${SHAFT.y}" width="${SHAFT.w}" height="${SHAFT.h}" rx="12"/>
   <g clip-path="url(#${clipId})">
@@ -178,6 +177,10 @@ export function liftMarkup(clipId: string): string {
   <path class="lift__rope"/>
   <circle class="lift__pulley" cx="${PULLEY.x}" cy="${PULLEY.y}" r="${PULLEY.r}"/>
   <circle class="lift__pulley-hub" cx="${PULLEY.x}" cy="${PULLEY.y}" r="1.8"/>
+
+  <!-- Above the hub gear, in the one part of the dial's interior no mechanism
+       reaches: the "100" tick ends at y=46 and the gear's teeth start at y=78. -->
+  <text class="lift__dial-unit" x="${HUB.x}" y="${(HUB.y - 34).toFixed(1)}">${UNIT}</text>
 
   ${gearGroup('hub', HUB, `<path class="lift__needle" d="M-3.4 0 L0 -${NEEDLE_LENGTH} L3.4 0 Z"/>`)}
 
