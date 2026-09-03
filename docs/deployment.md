@@ -67,20 +67,21 @@ certificates belong to something else. Two things to know.
 measurement response, and nginx honours that per response regardless of
 `proxy_buffering`. You do not have to change anything for the download phase.
 
-**Uploads are not.** There is no header equivalent for `proxy_request_buffering`,
-so nginx will spool the whole upload body — hundreds of megabytes — before
+**Uploads are not.** There is no header equivalent for
+`proxy_request_buffering`, so nginx spools the whole upload body before
 forwarding a byte of it. Open the proxy host, go to **Advanced → Custom Nginx
 Configuration**, and paste:
 
 ```nginx
 proxy_request_buffering off;
-client_max_body_size 0;
-proxy_read_timeout 300s;
-proxy_send_timeout 300s;
 ```
 
-`client_max_body_size` matters as much as the buffering: the nginx default is
-1 MB, so without it the upload phase is rejected with a `413`.
+That is genuinely all NPM needs. Its own defaults already cover the rest:
+`client_max_body_size 2000m` and `proxy_read_timeout 90s` are set globally, so
+neither the 1 MB body limit nor the 60 s timeout that bite on stock nginx apply
+here. Add `proxy_buffering off;` too if you like — it is redundant, because the
+`X-Accel-Buffering` header already handles the download direction, but it costs
+nothing.
 
 Also set `trusted_proxies` in megapet's own config to the address NPM connects
 from, or every result is recorded against NPM rather than the client.
