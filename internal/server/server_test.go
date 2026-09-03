@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nebuloss/speedtest/internal/config"
-	"github.com/nebuloss/speedtest/internal/metrics"
-	"github.com/nebuloss/speedtest/internal/store"
+	"github.com/nebuloss/megapet/internal/config"
+	"github.com/nebuloss/megapet/internal/metrics"
+	"github.com/nebuloss/megapet/internal/store"
 )
 
 func newServer(t *testing.T, mutate func(*config.Config)) (*httptest.Server, *store.DB) {
@@ -302,7 +302,7 @@ func TestHealthAndMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "speedtest_download_bytes_total") {
+	if !strings.Contains(string(body), "megapet_download_bytes_total") {
 		t.Error("metrics output is missing the download counter")
 	}
 }
@@ -313,7 +313,7 @@ func TestMetricsCanBeDisabled(t *testing.T) {
 	// be the Prometheus payload.
 	res := get(t, ts, "/metrics")
 	body, _ := io.ReadAll(res.Body)
-	if strings.Contains(string(body), "speedtest_download_bytes_total") {
+	if strings.Contains(string(body), "megapet_download_bytes_total") {
 		t.Error("metrics are still exposed after being disabled")
 	}
 }

@@ -2,7 +2,7 @@
 # Mirror this source tree to the build host. Builds never run on dev-code.
 set -eu
 HOST="${BUILD_HOST:-guillaume@10.0.50.21}"
-DEST="${BUILD_DEST:-~/build/speedtest}"
+DEST="${BUILD_DEST:-~/build/megapet}"
 ssh "$HOST" "mkdir -p $DEST"
 rsync -az --delete \
   --exclude '.git/' --exclude 'node_modules/' --exclude 'dist/' \

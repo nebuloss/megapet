@@ -1,6 +1,6 @@
 # Caddy needs far less persuasion than nginx: it streams by default and honours
 # the `Content-Encoding: identity` the measurement endpoints already send.
-speedtest.internal.example {
+megapet.internal.example {
 	# The measurement payloads are random by design, so compressing them only
 	# burns CPU. Everything else (HTML, CSS, JS, JSON) still gets encoded.
 	@measurement path /api/download /api/upload /api/ping /garbage.php /empty.php

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nebuloss/speedtest/internal/config"
-	"github.com/nebuloss/speedtest/internal/ipinfo"
-	"github.com/nebuloss/speedtest/internal/metrics"
-	"github.com/nebuloss/speedtest/internal/netutil"
-	"github.com/nebuloss/speedtest/internal/speed"
-	"github.com/nebuloss/speedtest/internal/store"
+	"github.com/nebuloss/megapet/internal/config"
+	"github.com/nebuloss/megapet/internal/ipinfo"
+	"github.com/nebuloss/megapet/internal/metrics"
+	"github.com/nebuloss/megapet/internal/netutil"
+	"github.com/nebuloss/megapet/internal/speed"
+	"github.com/nebuloss/megapet/internal/store"
 )
 
 // Version is stamped at build time with -ldflags.

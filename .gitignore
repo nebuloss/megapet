@@ -1,5 +1,5 @@
 /dist/
-/speedtestd
+/megapetd
 /internal/server/webdist/*
 !/internal/server/webdist/.gitkeep
 /web/node_modules/

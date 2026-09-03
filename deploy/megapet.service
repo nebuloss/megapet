@@ -1,20 +1,20 @@
 [Unit]
-Description=Speedtest server
-Documentation=https://github.com/nebuloss/speedtest
+Description=Megapet speedtest server
+Documentation=https://github.com/nebuloss/megapet
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=speedtest
-Group=speedtest
-ExecStart=/usr/local/bin/speedtestd -config /etc/speedtest/speedtest.json
+User=megapet
+Group=megapet
+ExecStart=/usr/local/bin/megapetd -config /etc/megapet/megapet.json
 Restart=on-failure
 RestartSec=2s
 
 # The database lives here; systemd creates it with the right ownership.
-StateDirectory=speedtest
-WorkingDirectory=/var/lib/speedtest
+StateDirectory=megapet
+WorkingDirectory=/var/lib/megapet
 
 # A speedtest server is a large, unauthenticated bandwidth source. Give it as
 # little of the host as it can run with.

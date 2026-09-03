@@ -23,7 +23,7 @@ import type { Drive, GaugeAccent, SpeedVisual } from './visual';
 
 type VisualKind = 'lift' | 'dial';
 
-const VISUAL_KEY = 'speedtest.visual';
+const VISUAL_KEY = 'megapet.visual';
 const HISTORY_DAYS = 30;
 const HISTORY_LIMIT = 25;
 

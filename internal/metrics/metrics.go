@@ -38,16 +38,16 @@ func (r *Registry) Handler() http.Handler {
 			value           float64
 		}
 		for _, m := range []metric{
-			{"speedtest_uptime_seconds", "Seconds since process start.", "gauge", time.Since(r.start).Seconds()},
-			{"speedtest_tests_started_total", "Test sessions started.", "counter", float64(r.TestsStarted.Load())},
-			{"speedtest_results_saved_total", "Results written to the store.", "counter", float64(r.ResultsSaved.Load())},
-			{"speedtest_download_bytes_total", "Bytes served by the download endpoint.", "counter", float64(r.DownloadBytes.Load())},
-			{"speedtest_upload_bytes_total", "Bytes consumed by the upload endpoint.", "counter", float64(r.UploadBytes.Load())},
-			{"speedtest_ping_requests_total", "Latency probe requests served.", "counter", float64(r.PingRequests.Load())},
-			{"speedtest_rejected_total", "Requests rejected by the concurrency limiter.", "counter", float64(r.Rejected.Load())},
-			{"speedtest_active_streams", "Download/upload streams in flight.", "gauge", float64(r.ActiveStreams.Load())},
-			{"speedtest_ipinfo_lookups_total", "Outbound ISP lookups attempted.", "counter", float64(r.IPInfoLookups.Load())},
-			{"speedtest_ipinfo_failures_total", "Outbound ISP lookups that failed.", "counter", float64(r.IPInfoFailures.Load())},
+			{"megapet_uptime_seconds", "Seconds since process start.", "gauge", time.Since(r.start).Seconds()},
+			{"megapet_tests_started_total", "Test sessions started.", "counter", float64(r.TestsStarted.Load())},
+			{"megapet_results_saved_total", "Results written to the store.", "counter", float64(r.ResultsSaved.Load())},
+			{"megapet_download_bytes_total", "Bytes served by the download endpoint.", "counter", float64(r.DownloadBytes.Load())},
+			{"megapet_upload_bytes_total", "Bytes consumed by the upload endpoint.", "counter", float64(r.UploadBytes.Load())},
+			{"megapet_ping_requests_total", "Latency probe requests served.", "counter", float64(r.PingRequests.Load())},
+			{"megapet_rejected_total", "Requests rejected by the concurrency limiter.", "counter", float64(r.Rejected.Load())},
+			{"megapet_active_streams", "Download/upload streams in flight.", "gauge", float64(r.ActiveStreams.Load())},
+			{"megapet_ipinfo_lookups_total", "Outbound ISP lookups attempted.", "counter", float64(r.IPInfoLookups.Load())},
+			{"megapet_ipinfo_failures_total", "Outbound ISP lookups that failed.", "counter", float64(r.IPInfoFailures.Load())},
 		} {
 			fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s %s\n%s %g\n", m.name, m.help, m.name, m.typ, m.name, m.value)
 		}

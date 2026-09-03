@@ -1,4 +1,4 @@
-# speedtest
+# megapet
 
 Self-hosted speedtest: Go backend + TypeScript frontend, shipped as one static
 binary (the SPA is embedded with `go:embed` from `internal/server/webdist`).
@@ -9,7 +9,7 @@ Never build on this machine. Mirror the tree to the build host and build there:
 
 ```sh
 ./sync-to-build.sh
-ssh guillaume@10.0.50.21 'cd ~/build/speedtest && rtk make check && rtk make build'
+ssh guillaume@10.0.50.21 'cd ~/build/megapet && rtk make check && rtk make build'
 ```
 
 `npm ci` works with the stock npm on dev-build, but **regenerating**

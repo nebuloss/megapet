@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 
-// The dev server proxies the API to a locally running speedtestd so the
+// The dev server proxies the API to a locally running megapetd so the
 // frontend can be iterated on without rebuilding the Go binary.
-const backend = process.env.SPEEDTEST_BACKEND ?? 'http://127.0.0.1:8080';
+const backend = process.env.MEGAPET_BACKEND ?? 'http://127.0.0.1:8080';
 
 export default defineConfig({
   build: {

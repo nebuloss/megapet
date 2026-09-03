@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nebuloss/speedtest/internal/netutil"
+	"github.com/nebuloss/megapet/internal/netutil"
 )
 
 // Info describes the network a client is connecting from.

@@ -1,4 +1,4 @@
-module github.com/nebuloss/speedtest
+module github.com/nebuloss/megapet
 
 go 1.25.0
 

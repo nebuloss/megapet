@@ -1,17 +1,17 @@
 # Builds run on the build host; this Makefile is meant to be invoked there.
-BINARY      := speedtestd
-CMD         := ./cmd/speedtestd
+BINARY      := megapetd
+CMD         := ./cmd/megapetd
 DIST        := dist
 WEBDIST     := internal/server/webdist
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS     := -s -w -X github.com/nebuloss/speedtest/internal/server.Version=$(VERSION)
+LDFLAGS     := -s -w -X github.com/nebuloss/megapet/internal/server.Version=$(VERSION)
 GOFLAGS     := -trimpath
 
 .PHONY: all build backend web web-deps dev dev-api fmt vet test check clean tidy run
 
 all: build
 
-## build: compile the frontend into the binary and produce dist/speedtestd
+## build: compile the frontend into the binary and produce dist/megapetd
 build: web backend
 
 backend:

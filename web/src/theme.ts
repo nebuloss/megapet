@@ -34,8 +34,8 @@ export const SEED_OPTIONS: readonly SeedOption[] = [
   { name: 'Lime', hex: '#7CB342' },
 ];
 
-const MODE_KEY = 'speedtest.theme.mode';
-const SEED_KEY = 'speedtest.theme.seed';
+const MODE_KEY = 'megapet.theme.mode';
+const SEED_KEY = 'megapet.theme.seed';
 
 /**
  * Neutral tones for the M3 surface roles. `themeFromSourceColor` still emits the

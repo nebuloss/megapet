@@ -58,11 +58,11 @@ func TestNormalizeFixesMetricsPath(t *testing.T) {
 }
 
 func TestLoadEnv(t *testing.T) {
-	t.Setenv("SPEEDTEST_LISTEN", "127.0.0.1:9000")
-	t.Setenv("SPEEDTEST_DOWNLOAD_STREAMS", "8")
-	t.Setenv("SPEEDTEST_DOWNLOAD_SECONDS", "7.5")
-	t.Setenv("SPEEDTEST_STORE_ENABLED", "false")
-	t.Setenv("SPEEDTEST_TRUSTED_PROXIES", "10.0.0.0/8, 192.168.0.0/16")
+	t.Setenv("MEGAPET_LISTEN", "127.0.0.1:9000")
+	t.Setenv("MEGAPET_DOWNLOAD_STREAMS", "8")
+	t.Setenv("MEGAPET_DOWNLOAD_SECONDS", "7.5")
+	t.Setenv("MEGAPET_STORE_ENABLED", "false")
+	t.Setenv("MEGAPET_TRUSTED_PROXIES", "10.0.0.0/8, 192.168.0.0/16")
 
 	cfg := Default()
 	if err := cfg.LoadEnv(); err != nil {
@@ -86,7 +86,7 @@ func TestLoadEnv(t *testing.T) {
 }
 
 func TestLoadEnvRejectsMalformedNumbers(t *testing.T) {
-	t.Setenv("SPEEDTEST_PING_COUNT", "many")
+	t.Setenv("MEGAPET_PING_COUNT", "many")
 	cfg := Default()
 	if err := cfg.LoadEnv(); err == nil {
 		t.Fatal("LoadEnv accepted a non-numeric ping count")

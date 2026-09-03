@@ -1,6 +1,6 @@
 {
   "listen": ":8080",
-  "base_url": "https://speedtest.internal.example",
+  "base_url": "https://megapet.internal.example",
   "trusted_proxies": ["10.0.0.0/8", "192.168.0.0/16", "127.0.0.1/32"],
 
   "test": {
@@ -23,7 +23,7 @@
 
   "store": {
     "enabled": true,
-    "path": "/var/lib/speedtest/speedtest.db",
+    "path": "/var/lib/megapet/megapet.db",
     "retention_days": 365,
     "record_ip": true,
     "anonymize_ip": false
@@ -38,7 +38,7 @@
   },
 
   "ui": {
-    "title": "Speedtest",
+    "title": "Megapet",
     "seed_color": "#4F6BED",
     "show_history": true,
     "auto_start": false

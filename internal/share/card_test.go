@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nebuloss/speedtest/internal/store"
+	"github.com/nebuloss/megapet/internal/store"
 )
 
 func TestRenderProducesWellFormedSVG(t *testing.T) {
 	var sb strings.Builder
 	err := Render(&sb, Card{
-		Title:  "Speedtest",
+		Title:  "Megapet",
 		Accent: "#4F6BED",
 		Result: store.Result{
 			ID:           "1PDASEXH1P",

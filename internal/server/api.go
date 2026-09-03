@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nebuloss/speedtest/internal/config"
-	"github.com/nebuloss/speedtest/internal/netutil"
-	"github.com/nebuloss/speedtest/internal/share"
-	"github.com/nebuloss/speedtest/internal/speed"
-	"github.com/nebuloss/speedtest/internal/store"
+	"github.com/nebuloss/megapet/internal/config"
+	"github.com/nebuloss/megapet/internal/netutil"
+	"github.com/nebuloss/megapet/internal/share"
+	"github.com/nebuloss/megapet/internal/speed"
+	"github.com/nebuloss/megapet/internal/store"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

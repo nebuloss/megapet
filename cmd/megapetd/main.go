@@ -1,4 +1,4 @@
-// Command speedtestd is a self-contained network speedtest server: measurement
+// Command megapetd is a self-contained network speedtest server: measurement
 // endpoints, a SQLite result history and an embedded web frontend in one binary.
 package main
 
@@ -15,15 +15,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nebuloss/speedtest/internal/config"
-	"github.com/nebuloss/speedtest/internal/metrics"
-	"github.com/nebuloss/speedtest/internal/server"
-	"github.com/nebuloss/speedtest/internal/store"
+	"github.com/nebuloss/megapet/internal/config"
+	"github.com/nebuloss/megapet/internal/metrics"
+	"github.com/nebuloss/megapet/internal/server"
+	"github.com/nebuloss/megapet/internal/store"
 )
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "speedtestd:", err)
+		fmt.Fprintln(os.Stderr, "megapetd:", err)
 		os.Exit(1)
 	}
 }
@@ -41,7 +41,7 @@ func run() error {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("speedtestd", server.Version)
+		fmt.Println("megapetd", server.Version)
 		return nil
 	}
 

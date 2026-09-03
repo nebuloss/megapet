@@ -1,4 +1,6 @@
-# Speedtest
+# Megapet
+
+*Megabits, and a pet.*
 
 A self-hosted network speedtest: a Go server and a TypeScript frontend that ship
 as **one static binary** with no runtime dependencies. Built as a lighter,
@@ -7,7 +9,7 @@ result history.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  speedtestd  (single binary, ~11 MB, CGO-free)               │
+│  megapetd  (single binary, ~11 MB, CGO-free)                 │
 │                                                              │
 │  /api/ping       empty 200s for latency and jitter           │
 │  /api/download   incompressible random bytes, N streams      │
@@ -44,8 +46,8 @@ result history.
 ## Quick start
 
 ```sh
-make build        # builds the SPA, embeds it, produces dist/speedtestd
-./dist/speedtestd # listens on :8080
+make build        # builds the SPA, embeds it, produces dist/megapetd
+./dist/megapetd # listens on :8080
 ```
 
 Then open <http://localhost:8080>.
@@ -98,15 +100,15 @@ returns the byte count it actually received so the two can be reconciled.
 
 ## Configuration
 
-Layered: built-in defaults → JSON file → `SPEEDTEST_*` environment → flags.
+Layered: built-in defaults → JSON file → `MEGAPET_*` environment → flags.
 
 ```sh
-speedtestd -config /etc/speedtest/speedtest.json
-speedtestd -dump-config          # print the effective config and exit
-speedtestd -listen :9000 -db /var/lib/speedtest/speedtest.db
+megapetd -config /etc/megapet/megapet.json
+megapetd -dump-config          # print the effective config and exit
+megapetd -listen :9000 -db /var/lib/megapet/megapet.db
 ```
 
-See [`speedtest.example.json`](speedtest.example.json) for every field.
+See [`megapet.example.json`](megapet.example.json) for every field.
 
 | Key | Default | Notes |
 | --- | --- | --- |
@@ -123,10 +125,10 @@ See [`speedtest.example.json`](speedtest.example.json) for every field.
 | `ipinfo.enabled` | `false` | Off by default: an internal speedtest should not phone home unless asked. Private addresses are labelled locally at no cost. |
 | `ui.seed_color` | `#4F6BED` | Seeds the whole Material You palette. |
 
-Common environment overrides: `SPEEDTEST_LISTEN`, `SPEEDTEST_DB`,
-`SPEEDTEST_TITLE`, `SPEEDTEST_SEED_COLOR`, `SPEEDTEST_TRUSTED_PROXIES`,
-`SPEEDTEST_DOWNLOAD_STREAMS`, `SPEEDTEST_ANONYMIZE_IP`,
-`SPEEDTEST_IPINFO_ENABLED`.
+Common environment overrides: `MEGAPET_LISTEN`, `MEGAPET_DB`,
+`MEGAPET_TITLE`, `MEGAPET_SEED_COLOR`, `MEGAPET_TRUSTED_PROXIES`,
+`MEGAPET_DOWNLOAD_STREAMS`, `MEGAPET_ANONYMIZE_IP`,
+`MEGAPET_IPINFO_ENABLED`.
 
 ### Multiple servers
 
@@ -171,13 +173,13 @@ client cannot poison the history.
 
 ## Deploying
 
-Copy `dist/speedtestd` to `/usr/local/bin`, the config to
-`/etc/speedtest/speedtest.json`, and install the unit:
+Copy `dist/megapetd` to `/usr/local/bin`, the config to
+`/etc/megapet/megapet.json`, and install the unit:
 
 ```sh
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin speedtest
-sudo install -m755 dist/speedtestd /usr/local/bin/speedtestd
-sudo install -Dm644 deploy/speedtest.service /etc/systemd/system/speedtest.service
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin megapet
+sudo install -m755 dist/megapetd /usr/local/bin/megapetd
+sudo install -Dm644 deploy/megapet.service /etc/systemd/system/megapet.service
 sudo systemctl enable --now speedtest
 ```
 
@@ -205,7 +207,7 @@ make test      # Go tests and the mechanics library's tests
 (the lift, the dial, the stat tiles, every palette) with no backend needed.
 
 ```
-cmd/speedtestd        entry point, flags, graceful shutdown
+cmd/megapetd        entry point, flags, graceful shutdown
 internal/config       layered configuration and validation
 internal/server       routing, middleware, JSON API, embedded SPA
 internal/speed        ping, download, upload, concurrency limiter
@@ -229,7 +231,7 @@ it somewhere else.
 
 ```sh
 ./sync-to-build.sh
-ssh guillaume@10.0.50.21 'cd ~/build/speedtest && make check && make build'
+ssh guillaume@10.0.50.21 'cd ~/build/megapet && make check && make build'
 ```
 
 ## Licence

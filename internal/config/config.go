@@ -1,7 +1,7 @@
 // Package config holds the runtime configuration for the speedtest server.
 //
 // Values are layered: built-in defaults, then an optional JSON file, then
-// environment variables (SPEEDTEST_*), then command-line flags.
+// environment variables (MEGAPET_*), then command-line flags.
 package config
 
 import (
@@ -125,7 +125,7 @@ func Default() Config {
 		},
 		Store: Store{
 			Enabled:       true,
-			Path:          "speedtest.db",
+			Path:          "megapet.db",
 			RetentionDays: 365,
 			RecordIP:      true,
 			AnonymizeIP:   false,
@@ -137,7 +137,7 @@ func Default() Config {
 			CacheTTLMS: 6 * 60 * 60 * 1000,
 		},
 		UI: UI{
-			Title:       "Speedtest",
+			Title:       "Megapet",
 			SeedColor:   "#4F6BED",
 			ShowHistory: true,
 			AutoStart:   false,
@@ -160,7 +160,7 @@ func (c *Config) LoadFile(path string) error {
 	return nil
 }
 
-// LoadEnv applies SPEEDTEST_* overrides.
+// LoadEnv applies MEGAPET_* overrides.
 func (c *Config) LoadEnv() error {
 	str := func(k string, dst *string) {
 		if v, ok := os.LookupEnv(k); ok {
@@ -204,29 +204,29 @@ func (c *Config) LoadEnv() error {
 		return nil
 	}
 
-	str("SPEEDTEST_LISTEN", &c.Listen)
-	str("SPEEDTEST_BASE_URL", &c.BaseURL)
-	str("SPEEDTEST_DB", &c.Store.Path)
-	str("SPEEDTEST_TITLE", &c.UI.Title)
-	str("SPEEDTEST_SEED_COLOR", &c.UI.SeedColor)
-	str("SPEEDTEST_IPINFO_PROVIDER", &c.IPInfo.Provider)
-	str("SPEEDTEST_IPINFO_TOKEN", &c.IPInfo.Token)
-	if v, ok := os.LookupEnv("SPEEDTEST_TRUSTED_PROXIES"); ok {
+	str("MEGAPET_LISTEN", &c.Listen)
+	str("MEGAPET_BASE_URL", &c.BaseURL)
+	str("MEGAPET_DB", &c.Store.Path)
+	str("MEGAPET_TITLE", &c.UI.Title)
+	str("MEGAPET_SEED_COLOR", &c.UI.SeedColor)
+	str("MEGAPET_IPINFO_PROVIDER", &c.IPInfo.Provider)
+	str("MEGAPET_IPINFO_TOKEN", &c.IPInfo.Token)
+	if v, ok := os.LookupEnv("MEGAPET_TRUSTED_PROXIES"); ok {
 		c.TrustedProxies = splitList(v)
 	}
 	for _, err := range []error{
-		num("SPEEDTEST_DOWNLOAD_STREAMS", &c.Test.DownloadStreams),
-		num("SPEEDTEST_UPLOAD_STREAMS", &c.Test.UploadStreams),
-		num("SPEEDTEST_PING_COUNT", &c.Test.PingCount),
-		num("SPEEDTEST_RETENTION_DAYS", &c.Store.RetentionDays),
-		flt("SPEEDTEST_DOWNLOAD_SECONDS", &c.Test.DownloadSeconds),
-		flt("SPEEDTEST_UPLOAD_SECONDS", &c.Test.UploadSeconds),
-		flt("SPEEDTEST_OVERHEAD_FACTOR", &c.Test.OverheadFactor),
-		bl("SPEEDTEST_STORE_ENABLED", &c.Store.Enabled),
-		bl("SPEEDTEST_RECORD_IP", &c.Store.RecordIP),
-		bl("SPEEDTEST_ANONYMIZE_IP", &c.Store.AnonymizeIP),
-		bl("SPEEDTEST_IPINFO_ENABLED", &c.IPInfo.Enabled),
-		bl("SPEEDTEST_METRICS_ENABLED", &c.Metrics.Enabled),
+		num("MEGAPET_DOWNLOAD_STREAMS", &c.Test.DownloadStreams),
+		num("MEGAPET_UPLOAD_STREAMS", &c.Test.UploadStreams),
+		num("MEGAPET_PING_COUNT", &c.Test.PingCount),
+		num("MEGAPET_RETENTION_DAYS", &c.Store.RetentionDays),
+		flt("MEGAPET_DOWNLOAD_SECONDS", &c.Test.DownloadSeconds),
+		flt("MEGAPET_UPLOAD_SECONDS", &c.Test.UploadSeconds),
+		flt("MEGAPET_OVERHEAD_FACTOR", &c.Test.OverheadFactor),
+		bl("MEGAPET_STORE_ENABLED", &c.Store.Enabled),
+		bl("MEGAPET_RECORD_IP", &c.Store.RecordIP),
+		bl("MEGAPET_ANONYMIZE_IP", &c.Store.AnonymizeIP),
+		bl("MEGAPET_IPINFO_ENABLED", &c.IPInfo.Enabled),
+		bl("MEGAPET_METRICS_ENABLED", &c.Metrics.Enabled),
 	} {
 		if err != nil {
 			return err

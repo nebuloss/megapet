@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nebuloss/speedtest/internal/store"
+	"github.com/nebuloss/megapet/internal/store"
 )
 
 // Card describes what to draw.
@@ -27,7 +27,7 @@ func Render(w io.Writer, c Card) error {
 	}
 	title := c.Title
 	if title == "" {
-		title = "Speedtest"
+		title = "Megapet"
 	}
 
 	r := c.Result
