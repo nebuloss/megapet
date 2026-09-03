@@ -26,6 +26,7 @@ import {
   EASE_TAU,
   HOME_MS,
   LAND_MS,
+  RETURN_MS,
   FORK,
   HUB,
   LAY,
@@ -132,6 +133,11 @@ export class LiftVisual implements SpeedVisual {
   private glideFrom = CAR.top;
   private glideTo = CAR.top;
   private glideMs = HOME_MS;
+
+  /** A scripted sweep of the needle back to its stop, 0..1; 1 when idle. */
+  private returnT = 1;
+  private returnFrom = 0;
+  private returnShown = 0;
 
   /** A direction change waiting for the car to stop before the gear is shifted. */
   private pendingDrive: Drive | null = null;
@@ -351,7 +357,17 @@ export class LiftVisual implements SpeedVisual {
   /** Sets the target and its scale position together; they must never drift. */
   private aim(mbps: number): void {
     this.target = mbps;
-    this.aimFraction = toFraction(mbps);
+    const next = toFraction(mbps);
+    if (next === 0 && this.aimFraction > 0 && !this.reducedMotion.matches) {
+      // Only on the way down to the stop, and only once: the reversing phase
+      // re-sends zero ten times a second and must not restart the sweep.
+      this.returnFrom = this.shownFraction;
+      this.returnShown = this.shown;
+      this.returnT = 0;
+    } else if (next > 0) {
+      this.returnT = 1;
+    }
+    this.aimFraction = next;
   }
 
   private startLoop(): void {
@@ -363,8 +379,17 @@ export class LiftVisual implements SpeedVisual {
 
       const aim = this.aimFraction;
       const before = this.shownFraction;
-      this.shown = approach(this.shown, this.target, dt, EASE_TAU);
-      this.shownFraction = approach(this.shownFraction, aim, dt, EASE_TAU);
+      if (this.returnT < 1) {
+        // Swinging back to the stop: a fixed sweep, with the readout falling on
+        // the same curve so the number and the needle stay together.
+        this.returnT = Math.min(1, this.returnT + dt / RETURN_MS);
+        const swing = easeInOut(this.returnT);
+        this.shownFraction = lerp(this.returnFrom, 0, swing);
+        this.shown = lerp(this.returnShown, 0, swing);
+      } else {
+        this.shown = approach(this.shown, this.target, dt, EASE_TAU);
+        this.shownFraction = approach(this.shownFraction, aim, dt, EASE_TAU);
+      }
       if (this.shiftT < 1) {
         this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);
         if (this.shiftT === 1) this.root.dataset.shifting = 'false';
@@ -378,6 +403,7 @@ export class LiftVisual implements SpeedVisual {
         Math.abs(aim - before) < 0.0005 &&
         this.shiftT === 1 &&
         this.glideT === 1 &&
+        this.returnT === 1 &&
         !this.pendingDrive;
       if (settled) {
         this.shown = this.target;

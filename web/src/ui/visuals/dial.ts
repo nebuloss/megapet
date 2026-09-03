@@ -199,8 +199,11 @@ export class DialVisual implements SpeedVisual {
         this.frame = 0;
         return;
       }
-      this.shown += (this.target - this.shown) * 0.22;
-      this.shownFraction += delta * 0.22;
+      // Chasing a live reading wants to be quick; falling back to the stop
+      // between phases wants to look like a needle, not a reset.
+      const rate = aim === 0 ? 0.045 : 0.22;
+      this.shown += (this.target - this.shown) * rate;
+      this.shownFraction += delta * rate;
       this.paint();
       this.frame = requestAnimationFrame(step);
     };

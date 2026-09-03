@@ -128,6 +128,15 @@ export const STAGE = {
 
 export const EASE_TAU = 110;
 
+/**
+ * How long the needle takes to swing back to its stop between phases.
+ *
+ * Zeroing the reading is a scripted sweep, not a reading being tracked. At the
+ * reading's own time constant a full-scale drop is 36 degrees in the first
+ * frame and over in three, which reads as a reset rather than a needle.
+ */
+export const RETURN_MS = 900;
+
 /** How long the machine takes to return the car to the top floor before a run. */
 export const HOME_MS = 900;
 
