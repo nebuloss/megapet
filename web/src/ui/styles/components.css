@@ -743,8 +743,15 @@
   gap: 0.25rem;
 }
 
+/*
+ * Sized by height, not width. A fixed width made the scene as tall as its
+ * aspect ratio demanded, which pushed the page past the viewport on a laptop;
+ * driving it from the viewport height means it shrinks to fit instead.
+ */
 .lift__stage {
-  width: min(17rem, 70vw);
+  aspect-ratio: 280 / 384;
+  height: clamp(17rem, 48dvh, 30rem);
+  max-width: min(23rem, 84vw);
 }
 
 .lift__svg {

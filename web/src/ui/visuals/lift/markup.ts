@@ -6,6 +6,7 @@ import {
   ARC_LENGTH,
   BRAKE,
   CAR,
+  CAR_WINDOW,
   DIAL,
   DRIVE,
   DRIVEN,
@@ -157,7 +158,7 @@ export function liftMarkup(clipId: string): string {
     <path class="lift__hook" d="M${CAR.x} -6v6M${CAR.x - 6} 0h12"/>
     <rect class="lift__car-roof" x="${CAR.x - CAR.w / 2 - 3}" y="0" width="${CAR.w + 6}" height="6" rx="3"/>
     <rect class="lift__car-body" x="${CAR.x - CAR.w / 2}" y="5" width="${CAR.w}" height="${CAR.h - 5}" rx="8"/>
-    <rect class="lift__car-window" x="${CAR.x - CAR.w / 2 + 7}" y="11" width="${CAR.w - 14}" height="34" rx="6"/>
+    <rect class="lift__car-window" x="${CAR_WINDOW.x}" y="${CAR_WINDOW.y}" width="${CAR_WINDOW.width}" height="${CAR_WINDOW.height}" rx="6"/>
     <path class="lift__car-lamp" d="M${CAR.x - 4} 13h8"/>
     <path class="lift__bracket" d="M${CAR.x - CAR.w / 2} 14H${ROPE_RUN_X.toFixed(1)}"/>
     <circle class="lift__lever-mount" cx="${LEVER.x}" cy="${LEVER.y}" r="2.6"/>
@@ -167,8 +168,8 @@ export function liftMarkup(clipId: string): string {
       <path class="lift__lever-arm" d="M${LEVER.x} ${LEVER.y}V${LEVER.y + LEVER.handle}"/>
       <circle class="lift__lever-knob" cx="${LEVER.x}" cy="${LEVER.y + LEVER.handle}" r="2.7"/>
     </g>
-    <g transform="translate(${NOOKIE.x} ${NOOKIE.y}) scale(${NOOKIE.scale})">${nookieMarkup()}</g>
-    <path class="lift__car-floor" d="M${CAR.x - CAR.w / 2 + 5} 48h${CAR.w - 10}"/>
+    <g transform="translate(${NOOKIE.x.toFixed(2)} ${NOOKIE.y.toFixed(2)}) scale(${NOOKIE.scale.toFixed(3)})">${nookieMarkup()}</g>
+    <path class="lift__car-floor" d="M${CAR.x - CAR.w / 2 + 5} ${CAR.h - 8}h${CAR.w - 10}"/>
   </g>
 
   <path class="lift__spring"/>

@@ -123,7 +123,13 @@ export class App {
     this.resultView?.destroy();
     this.resultView = null;
 
-    this.main.replaceChildren(this.hero.root, this.stats.root, this.shareSlot, this.history.root);
+    // The hero takes the first column and everything else stacks in the
+    // second, so a wide screen is not a narrow strip down the middle.
+    this.main.dataset.layout = 'split';
+    this.main.replaceChildren(
+      this.hero.root,
+      el('div', { class: 'page-stack' }, this.stats.root, this.shareSlot, this.history.root),
+    );
 
     if (this.config.show_history) void this.history.refresh();
     else this.history.clear();
@@ -134,6 +140,7 @@ export class App {
   private showResult(id: string): void {
     this.resultView?.destroy();
     this.resultView = new ResultView(this.api, this.snackbar, () => this.router.navigate('/'));
+    this.main.dataset.layout = 'single';
     this.main.replaceChildren(this.resultView.root);
     void this.resultView.load(id);
   }

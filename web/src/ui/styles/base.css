@@ -81,9 +81,35 @@ main {
   margin-inline: auto;
   padding: var(--page-gutter);
   padding-bottom: max(var(--page-gutter), env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 1.5rem;
+  align-content: start;
+}
+
+/*
+ * Wide screens put the visual beside everything else rather than above it.
+ * Stacked, the page was a narrow column down the middle with the sides empty,
+ * and tall enough to need a scrollbar on anything under about 900px.
+ */
+@media (min-width: 62rem) {
+  main {
+    grid-template-columns: minmax(19rem, 25rem) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 2rem;
+  }
+
+  /* The shared-result screen has nothing to put beside itself. */
+  main[data-layout='single'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Everything that sits in the second column. */
+.page-stack {
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+  min-width: 0;
 }
 
 .page-footer {

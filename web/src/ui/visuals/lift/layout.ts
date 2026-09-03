@@ -6,7 +6,17 @@
  * whole trick: nothing ever meshes or unmeshes, so no part can be driven
  * through another, and the two directions travel at the same rate.
  */
-import { gear, pulley, toRadians, type Gear, type Point, type Pulley } from '../../../mech';
+import {
+  fitTransform,
+  gear,
+  pulley,
+  toRadians,
+  type Bounds,
+  type Gear,
+  type Point,
+  type Pulley,
+  type Rect,
+} from '../../../mech';
 
 export const MODULE = 2.6;
 
@@ -34,7 +44,11 @@ export const RING_LENGTH = 2 * Math.PI * DIAL.ringRadius * (SWEEP / 360);
 /** Rope passed over the sheave by a full sweep of the needle. */
 export const TRAVEL = DRIVE_RATIO * SWEEP_RAD * SHEAVE.radius;
 
-export const CAR = { w: 60, h: 56, x: SHEAVE.x - SHEAVE.radius, top: 212 };
+// Tall rather than wide: the car cannot widen, because the counterweight hangs
+// only 52 units away and that distance is fixed by the sheave's radius. Height
+// was the binding constraint on Nookies anyway — he filled 85% of the old
+// window vertically and 57% of it across.
+export const CAR = { w: 60, h: 70, x: SHEAVE.x - SHEAVE.radius, top: 206 };
 export const CAR_BOTTOM = CAR.top + TRAVEL;
 export const WEIGHT = { w: 20, h: 38, x: SHEAVE.x + SHEAVE.radius, low: 300 };
 export const SHAFT = { x: 74, y: 200, w: 118, h: 172 };
@@ -72,7 +86,30 @@ export const LEVER = {
   seatDown: -FORK_TRAVEL / 2,
 };
 
-export const NOOKIE = { x: CAR.x, y: 30, scale: 0.55 };
+/**
+ * The extent Nookies occupies in his own coordinates — ear tips to feet,
+ * including the arms. Measured from the drawing in `nookie.ts`; if that
+ * changes shape, change this and nothing else.
+ */
+export const NOOKIE_BOUNDS: Bounds = { minX: -26, minY: -27, maxX: 26, maxY: 24 };
+
+/** The window he rides behind, derived from the car rather than restated. */
+export const CAR_WINDOW: Rect = {
+  x: CAR.x - CAR.w / 2 + 7,
+  y: 11,
+  width: CAR.w - 14,
+  height: CAR.h - 22,
+};
+
+/**
+ * Where Nookies sits, solved from the window instead of hand-tuned.
+ *
+ * This is the point: resizing the car resizes and re-centres him, with no
+ * second constant to keep in step and nothing that can quietly start
+ * overflowing the glass. `maxScale` only stops a very large car inflating him
+ * past his drawn proportions.
+ */
+export const NOOKIE = fitTransform(NOOKIE_BOUNDS, CAR_WINDOW, { padding: 1.5, maxScale: 1.1 });
 
 /**
  * The throw, stage by stage. Slow on purpose: the belt walking across is the
