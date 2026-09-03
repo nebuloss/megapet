@@ -7,6 +7,8 @@ versions follow [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+## 1.1.0 — 2026-09-03
+
 ### Added
 
 - `direct`: optionally advertise an address that bypasses a reverse proxy, so
@@ -26,6 +28,28 @@ versions follow [Semantic Versioning](https://semver.org).
   on for the page and its assets; the measurement payloads are still never
   touched, because the server marks them `Content-Encoding: identity` and nginx
   skips any response that already declares an encoding.
+- The hero visual left the car wherever the reading stopped, so a 940 Mbps
+  download on a scale that reaches ten gigabits parked it three quarters of the
+  way down and abandoned it there. Each leg now runs into the floor it was
+  heading for, and the reversing gear waits for the car to stop before it
+  shifts.
+- The dial's graduations were not evenly spaced. `log10(1 + mbps)` shifted the
+  scale, so the first decade got 50 degrees of a 270 degree sweep and the last
+  got 67.5, with a dead 20 degree run before the "1". Every decade now gets a
+  quarter of the dial, and the face says what it is counting.
+- Animating the reading rather than its position on the scale swept the needle
+  across 53% of the dial in the first frame of every phase, dragging the gear
+  train and the car with it. Both visuals now animate the scale position.
+- Zeroing the reading between phases moved the needle 36.6 degrees in one
+  frame, which read as a reset rather than a return. It is now a timed sweep.
+- Starting a second test snapped the needle to zero and threw the car back to
+  the top floor. The car is driven home instead.
+- `outline-variant` was used for boundaries that carry meaning, at 1.6:1
+  against the surface where 3:1 is needed. Component borders now use `outline`.
+- Dark Reader re-themed a page that already generates its own dark palette from
+  a seed, inverting it twice over. The documented opt-out is now declared.
+- Phone layout: the visual is capped shorter and the four figures sit in one
+  row, so they are all on the first screen while a test runs.
 
 ## 1.0.0 — 2026-09-03
 
