@@ -11,7 +11,7 @@ import './preview.css';
 
 import { toFraction } from '../src/ui/scale';
 import { Gauge } from '../src/ui/gauge';
-import { LiftScene } from '../src/ui/liftscene';
+import { LiftScene } from '../src/ui/lift';
 import { StatTiles } from '../src/ui/stats';
 import { el } from '../src/ui/dom';
 import { icon, sunIcon } from '../src/ui/icons';

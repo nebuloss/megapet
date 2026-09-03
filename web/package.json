@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "build:preview": "vite build --config vite.preview.config.ts"
+    "build:preview": "vite build --config vite.preview.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0"
@@ -16,6 +18,7 @@
   "devDependencies": {
     "@types/node": "^26.4.1",
     "typescript": "^5.9.3",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

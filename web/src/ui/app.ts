@@ -16,7 +16,7 @@ import { clear, el, hydrateRipples } from './dom';
 import { Gauge } from './gauge';
 import { renderHistory, renderSummary } from './history';
 import { icon, sunIcon, type IconName } from './icons';
-import { LiftScene } from './liftscene';
+import { LiftScene } from './lift';
 import { toast } from './snackbar';
 import { StatTiles } from './stats';
 import type { Drive, GaugeAccent, SpeedVisual } from './visual';

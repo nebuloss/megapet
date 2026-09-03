@@ -52,6 +52,7 @@ vet:
 
 test:
 	go test ./...
+	cd web && npm test
 
 check: fmt vet test
 	cd web && npm run typecheck

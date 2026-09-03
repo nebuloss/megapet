@@ -842,7 +842,7 @@
   opacity: 0.55;
 }
 
-.lift__gear--drum .lift__gear-body {
+.lift__gear--sheave .lift__gear-body {
   fill: color-mix(in srgb, var(--lift-accent) 78%, var(--md-sys-color-surface-container-highest));
 }
 
@@ -857,39 +857,66 @@
   stroke-linecap: round;
 }
 
-.lift__drum-groove {
+/* The rope groove: this is a traction sheave, not a winding drum — the rope
+   passes over it with the car on one side and the counterweight on the other. */
+.lift__sheave-groove {
   fill: none;
   stroke: color-mix(in srgb, var(--md-sys-color-surface) 70%, transparent);
   stroke-width: 2.4;
-  stroke-linecap: round;
 }
 
-/* --- the shifter linkage Nookies throws --- */
+/* --- the shifter: rope, drum, detent and return spring --- */
 
 .lift__lever-mount,
-.lift__pulley {
+.lift__pulley,
+.lift__shift-drum {
   fill: var(--md-sys-color-surface-container-highest);
   stroke: var(--md-sys-color-outline);
   stroke-width: 1.2;
 }
 
+.lift__shift-drum {
+  fill: var(--md-sys-color-surface-container);
+}
+
 .lift__lever-arm,
-.lift__lever-tail,
-.lift__crank-arm {
+.lift__lever-tail {
   fill: none;
   stroke: var(--md-sys-color-outline);
   stroke-width: 2.4;
   stroke-linecap: round;
 }
 
-.lift__lever-knob,
-.lift__crank-pin {
+.lift__lever-knob {
   fill: var(--md-sys-color-error);
   stroke: none;
 }
 
 .lift__lever-pin,
-.lift__pulley-hub {
+.lift__pulley-hub,
+.lift__spring-anchor {
+  fill: var(--md-sys-color-outline);
+}
+
+.lift__rope-pin,
+.lift__spring-pin {
+  fill: var(--md-sys-color-error);
+}
+
+/* Detent notches, and the sprung roller that drops into them. A detent is what
+   lets the rope go slack as the car travels without the gearbox wandering. */
+.lift__detent-notch {
+  fill: var(--md-sys-color-surface-container-lowest);
+}
+
+.lift__pawl-spring {
+  fill: none;
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.lift__pawl-roller {
   fill: var(--md-sys-color-outline);
 }
 
@@ -900,25 +927,24 @@
   stroke-linecap: round;
 }
 
-/* Thin and dashed, so the control rope never reads as a hoist cable. */
+/* Thin, so the control rope never reads as a hoist rope. */
 .lift__rope {
   fill: none;
   stroke: var(--md-sys-color-outline);
   stroke-width: 1.3;
-  stroke-dasharray: 4 3;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
-/* One bright dash travelling the rope: the pull reaching the gearbox. */
-.lift__rope-pulse {
+/* The rope can only pull; this returns the yoke when the lever pays out. */
+.lift__spring {
   fill: none;
   stroke: var(--md-sys-color-error);
-  stroke-width: 3.2;
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0;
+  opacity: 0.85;
 }
 
 /* --- shaft --- */

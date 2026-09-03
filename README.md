@@ -35,10 +35,11 @@ result history.
   (three meshes, drum anticlockwise, car down). So downloads send the car
   *down* the shaft and uploads wind it back *up*, and the car's travel is
   derived from the needle angle through the train rather than animated beside
-  it. Nookies throws the shift himself: he pulls the lever in the car, the
-  pull runs up a control rope, over a guide pulley and onto the bellcrank on
-  the yoke axle. A plain circular dial is one menu click away for anyone who
-  wants the boring version.
+  it. The reverser is a *tumbler reverse* — the gear train a lathe uses to
+  reverse its leadscrew — cut to a single module with tooth counts for ratios
+  and tooth phases solved so the teeth actually mesh. Nookies throws it
+  himself, through a rope-and-spring shifter with a detent. A plain circular
+  dial is one menu click away for anyone who wants the boring version.
 
 ## Quick start
 
@@ -196,8 +197,8 @@ address.
 ```sh
 make dev-api   # backend on :8080 with debug logging
 make dev       # Vite dev server on :5173, proxying /api to :8080
-make check     # gofmt, go vet, go test, tsc --noEmit
-make test      # Go tests only
+make check     # gofmt, go vet, go test, vitest, tsc --noEmit
+make test      # Go tests and the mechanics library's tests
 ```
 
 `npm --prefix web run build:preview` builds a standalone component playground
@@ -214,7 +215,9 @@ internal/ipinfo       optional ISP lookup with caching
 internal/share        SVG result card
 internal/metrics      Prometheus counters
 web/src/engine        the measurement engine (latency, transfer, runner)
-web/src/ui            components: lift scene, dial, tiles, history
+web/src/mech          mechanics library: geometry, spur gears, the tumbler
+                      reverse, rope, springs and detents — no speedtest in it
+web/src/ui            components: the lift scene, the dial, tiles, history
 web/src/theme.ts      Material You palette generation
 ```
 
