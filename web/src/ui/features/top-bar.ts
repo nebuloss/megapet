@@ -8,6 +8,8 @@ import { VISUALS, type VisualKind } from '../visuals';
 
 export interface TopBarHandlers {
   readonly onHome: () => void;
+  /** Every backend the visitor may pick, direct address included. */
+  readonly peers: () => readonly Peer[];
   readonly onPeerChange: (peer: Peer | null) => void;
   readonly onVisualChange: (kind: VisualKind) => void;
   /** Reads the current selections, so menus reflect live state when opened. */
@@ -38,7 +40,7 @@ export class TopBar extends Component<HTMLElement> {
 
     this.themeToggle = this.buildThemeToggle();
     const actions: HTMLElement[] = [];
-    if ((config.servers ?? []).length > 0) actions.push(this.buildServerMenu().root);
+    if (handlers.peers().length > 0) actions.push(this.buildServerMenu().root);
     actions.push(this.themeToggle, this.buildSettingsMenu().root);
 
     this.root.append(
@@ -91,7 +93,7 @@ export class TopBar extends Component<HTMLElement> {
   private buildServerMenu(): MenuButton {
     const menu = new MenuButton('server', 'Choose a test server', (close) => {
       const selected = this.handlers.currentPeer();
-      const options: (Peer | null)[] = [null, ...(this.config.servers ?? [])];
+      const options: (Peer | null)[] = [null, ...this.handlers.peers()];
       return [
         menuLabel('Test server'),
         ...options.map((option) =>

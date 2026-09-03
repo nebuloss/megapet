@@ -7,6 +7,15 @@ versions follow [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+### Added
+
+- `direct`: optionally advertise an address that bypasses a reverse proxy, so
+  the page loads and saves results through it while ping, download and upload
+  go straight to the server. Derived from `listen` when not set explicitly,
+  probed by the browser on load, and preferred automatically once it answers.
+- `tls`: serve https directly. Chiefly so the direct measurement path is usable
+  from an https page, which browsers otherwise block as mixed content.
+
 ## 1.0.0 — 2026-09-03
 
 First public release.

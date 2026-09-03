@@ -23,6 +23,8 @@ type Config struct {
 	// Empty means the client IP is always taken from the socket.
 	TrustedProxies []string `json:"trusted_proxies"`
 
+	TLS     TLS     `json:"tls"`
+	Direct  Direct  `json:"direct"`
 	Test    Test    `json:"test"`
 	Limits  Limits  `json:"limits"`
 	Store   Store   `json:"store"`
@@ -30,6 +32,36 @@ type Config struct {
 	UI      UI      `json:"ui"`
 	Servers []Peer  `json:"servers"`
 	Metrics Metrics `json:"metrics"`
+}
+
+// TLS serves the whole surface over https directly, without a proxy in front.
+//
+// Mostly worth it for one reason: a page served over https cannot measure
+// against an http address, because browsers block it as mixed content. If you
+// terminate TLS at a proxy and still want the direct measurement path, the
+// server has to be able to speak https itself.
+type TLS struct {
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// Enabled reports whether a certificate and key were both configured.
+func (t TLS) Enabled() bool { return t.CertFile != "" && t.KeyFile != "" }
+
+// Direct advertises an address that reaches this server without passing
+// through a reverse proxy.
+//
+// A proxy is the honest answer to "how fast is this server for me", because it
+// is how clients actually reach it. It is the wrong answer to "how fast is this
+// link", because a proxy adds a copy per buffer and, misconfigured, can
+// understate the result by an order of magnitude. Enabling this lets the page
+// measure past it while still loading, and saving its results, through it.
+type Direct struct {
+	Enabled bool `json:"enabled"`
+	// URL to measure against. Left empty, it is derived from `listen` at
+	// startup — which guesses on a multi-homed host, so set it explicitly if
+	// the guess is wrong.
+	URL string `json:"url"`
 }
 
 // Test controls the measurement parameters handed to the browser.
@@ -107,6 +139,7 @@ func Default() Config {
 	return Config{
 		Listen:  ":8080",
 		BaseURL: "",
+		Direct:  Direct{Enabled: false},
 		Test: Test{
 			PingCount:        12,
 			PingWarmup:       2,
@@ -209,6 +242,9 @@ func (c *Config) LoadEnv() error {
 	str("MEGAPET_DB", &c.Store.Path)
 	str("MEGAPET_TITLE", &c.UI.Title)
 	str("MEGAPET_SEED_COLOR", &c.UI.SeedColor)
+	str("MEGAPET_TLS_CERT", &c.TLS.CertFile)
+	str("MEGAPET_TLS_KEY", &c.TLS.KeyFile)
+	str("MEGAPET_DIRECT_URL", &c.Direct.URL)
 	str("MEGAPET_IPINFO_PROVIDER", &c.IPInfo.Provider)
 	str("MEGAPET_IPINFO_TOKEN", &c.IPInfo.Token)
 	if v, ok := os.LookupEnv("MEGAPET_TRUSTED_PROXIES"); ok {
@@ -225,6 +261,7 @@ func (c *Config) LoadEnv() error {
 		bl("MEGAPET_STORE_ENABLED", &c.Store.Enabled),
 		bl("MEGAPET_RECORD_IP", &c.Store.RecordIP),
 		bl("MEGAPET_ANONYMIZE_IP", &c.Store.AnonymizeIP),
+		bl("MEGAPET_DIRECT_ENABLED", &c.Direct.Enabled),
 		bl("MEGAPET_IPINFO_ENABLED", &c.IPInfo.Enabled),
 		bl("MEGAPET_METRICS_ENABLED", &c.Metrics.Enabled),
 	} {
@@ -240,6 +277,7 @@ func (c *Config) Normalize() error {
 	c.IPInfo.Timeout = time.Duration(c.IPInfo.TimeoutMS) * time.Millisecond
 	c.IPInfo.CacheTTL = time.Duration(c.IPInfo.CacheTTLMS) * time.Millisecond
 	c.BaseURL = strings.TrimRight(c.BaseURL, "/")
+	c.Direct.URL = strings.TrimRight(c.Direct.URL, "/")
 	if c.Metrics.Path == "" {
 		c.Metrics.Path = "/metrics"
 	}
@@ -277,6 +315,13 @@ func (c *Config) Normalize() error {
 	}
 	if c.Store.Enabled && c.Store.Path == "" {
 		errs = append(errs, errors.New("store.path must be set when store.enabled"))
+	}
+	if (c.TLS.CertFile == "") != (c.TLS.KeyFile == "") {
+		errs = append(errs, errors.New("tls.cert_file and tls.key_file must be set together"))
+	}
+	if c.Direct.URL != "" && !strings.HasPrefix(c.Direct.URL, "http://") &&
+		!strings.HasPrefix(c.Direct.URL, "https://") {
+		errs = append(errs, errors.New("direct.url must start with http:// or https://"))
 	}
 	switch c.IPInfo.Provider {
 	case "ipapi", "ipinfo":

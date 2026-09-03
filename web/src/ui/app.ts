@@ -6,6 +6,7 @@ import { Router } from '../routing';
 import type { ThemeController } from '../theme';
 import { Snackbar } from './components';
 import {
+  DIRECT_PEER_ID,
   Hero,
   HistoryPanel,
   ResultView,
@@ -13,6 +14,8 @@ import {
   StatTiles,
   TestController,
   TopBar,
+  directIsReachable,
+  directPeer,
 } from './features';
 import { el } from './primitives/dom';
 
@@ -44,6 +47,8 @@ export class App {
   private resultView: ResultView | null = null;
 
   private peer: Peer | null;
+  /** Configured backends, plus the server's own address when it is usable. */
+  private peers: Peer[];
 
   constructor(
     private readonly config: ClientConfig,
@@ -51,7 +56,8 @@ export class App {
     theme: ThemeController,
     preferences: Preferences,
   ) {
-    this.peer = config.servers?.find((server) => server.default) ?? null;
+    this.peers = [...(config.servers ?? [])];
+    this.peer = this.peers.find((server) => server.default) ?? null;
 
     this.hero = new Hero(
       preferences,
@@ -61,6 +67,7 @@ export class App {
 
     this.topBar = new TopBar(config, theme, {
       onHome: () => this.router.navigate('/'),
+      peers: () => this.peers,
       onPeerChange: (peer) => {
         this.peer = peer;
         void this.refreshConnection();
@@ -99,7 +106,7 @@ export class App {
       .start();
 
     void this.refreshConnection();
-    void this.selectClosestPeer();
+    void this.offerDirect().then(() => this.selectClosestPeer());
   }
 
   destroy(): void {
@@ -167,6 +174,27 @@ export class App {
   }
 
   /**
+   * Offers the server's own address as a peer, if it advertised one and it
+   * actually answers.
+   *
+   * Preferred automatically once reachable: an operator only advertises it in
+   * order to be measured past the proxy, so selecting it is what enabling the
+   * option meant. The proxy path stays in the menu, because "how fast is this
+   * server through the front door" is a real question too.
+   */
+  private async offerDirect(): Promise<void> {
+    const offer = directPeer(this.config);
+    if (offer.status !== 'offered') return;
+    if (!(await directIsReachable(offer.peer))) return;
+
+    this.peers = [offer.peer, ...this.peers];
+    if (!this.peer && !this.tests.isRunning) {
+      this.peer = offer.peer;
+      void this.refreshConnection();
+    }
+  }
+
+  /**
    * With several backends configured and none marked default, probe them and
    * keep the closest. Runs in the background; a failure leaves the selection
    * alone.
@@ -174,6 +202,8 @@ export class App {
   private async selectClosestPeer(): Promise<void> {
     const servers = this.config.servers ?? [];
     if (servers.length < 2 || servers.some((server) => server.default)) return;
+    // The direct address was chosen deliberately; do not second-guess it.
+    if (this.peer?.id === DIRECT_PEER_ID) return;
 
     const controller = new AbortController();
     const probes = await Promise.allSettled(

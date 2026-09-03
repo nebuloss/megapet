@@ -5,3 +5,4 @@ export * from './history-panel';
 export * from './result-view';
 export * from './share-panel';
 export * from './test-controller';
+export * from './direct-endpoint';

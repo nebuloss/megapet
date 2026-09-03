@@ -3,6 +3,7 @@ package netutil
 import (
 	"net/http"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
@@ -131,5 +132,72 @@ func TestIsPrivate(t *testing.T) {
 		if IsPrivate(netip.MustParseAddr(s)) {
 			t.Errorf("IsPrivate(%s) = true, want false", s)
 		}
+	}
+}
+
+func TestDirectURL(t *testing.T) {
+	tests := []struct {
+		name   string
+		listen string
+		want   string
+		ok     bool
+	}{
+		{"explicit address is used as-is", "192.0.2.10:8080", "http://192.0.2.10:8080", true},
+		{"hostname is used as-is", "megapet.example:9000", "http://megapet.example:9000", true},
+		{"ipv6 is bracketed", "[2001:db8::1]:8080", "http://[2001:db8::1]:8080", true},
+		// Advertising a loopback address would send every client to itself.
+		{"loopback is refused", "127.0.0.1:8080", "", false},
+		{"ipv6 loopback is refused", "[::1]:8080", "", false},
+		{"no port", "192.0.2.10", "", false},
+		{"empty", "", "", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := DirectURL(tc.listen, false)
+			if ok != tc.ok {
+				t.Fatalf("DirectURL(%q) ok = %v, want %v", tc.listen, ok, tc.ok)
+			}
+			if ok && got != tc.want {
+				t.Errorf("DirectURL(%q) = %q, want %q", tc.listen, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDirectURLUsesHTTPSWhenTheServerTerminatesTLS(t *testing.T) {
+	// An https page cannot fetch an http origin, so the scheme has to follow
+	// whether the server itself is serving TLS.
+	got, ok := DirectURL("192.0.2.10:8443", true)
+	if !ok || got != "https://192.0.2.10:8443" {
+		t.Errorf("DirectURL(secure) = %q, %v; want https://192.0.2.10:8443", got, ok)
+	}
+}
+
+func TestDirectURLFillsInAWildcardListener(t *testing.T) {
+	// A wildcard listener has no usable host, so the primary interface address
+	// stands in. Whether one exists depends on the machine, so assert the shape
+	// rather than a value.
+	for _, listen := range []string{":8080", "0.0.0.0:8080", "[::]:8080"} {
+		got, ok := DirectURL(listen, false)
+		if !ok {
+			t.Skipf("no routable address on this host, so %q cannot be resolved", listen)
+		}
+		if !strings.HasPrefix(got, "http://") || !strings.HasSuffix(got, ":8080") {
+			t.Errorf("DirectURL(%q) = %q, want an http URL on port 8080", listen, got)
+		}
+		if strings.Contains(got, "127.0.0.1") || strings.Contains(got, "[::1]") {
+			t.Errorf("DirectURL(%q) = %q, which is loopback", listen, got)
+		}
+	}
+}
+
+func TestPrimaryAddressIsRoutable(t *testing.T) {
+	addr, ok := PrimaryAddress()
+	if !ok {
+		t.Skip("no routable address on this host")
+	}
+	if addr.IsLoopback() || addr.IsLinkLocalUnicast() || !addr.IsGlobalUnicast() {
+		t.Errorf("PrimaryAddress() = %s, which is not routable", addr)
 	}
 }

@@ -24,6 +24,8 @@ export interface ClientConfig {
   show_history: boolean;
   auto_start: boolean;
   store_enabled: boolean;
+  /** Address that bypasses any reverse proxy, or empty if none is advertised. */
+  direct_url: string;
   version: string;
   test: TestParams;
   servers: Peer[] | null;

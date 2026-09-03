@@ -17,6 +17,7 @@ import (
 
 	"github.com/nebuloss/megapet/internal/config"
 	"github.com/nebuloss/megapet/internal/metrics"
+	"github.com/nebuloss/megapet/internal/netutil"
 	"github.com/nebuloss/megapet/internal/server"
 	"github.com/nebuloss/megapet/internal/store"
 )
@@ -64,6 +65,14 @@ func run() error {
 		return err
 	}
 
+	// Derived after Normalize, because it depends on the resolved listen
+	// address and on this host's interfaces.
+	if cfg.Direct.Enabled && cfg.Direct.URL == "" {
+		if url, ok := netutil.DirectURL(cfg.Listen, cfg.TLS.Enabled()); ok {
+			cfg.Direct.URL = url
+		}
+	}
+
 	log := newLogger(*logLevel, *logFormat)
 
 	if *dumpConfig {
@@ -107,10 +116,18 @@ func run() error {
 	go func() {
 		log.Info("listening",
 			"addr", cfg.Listen,
+			"direct", cfg.Direct.URL,
+			"tls", cfg.TLS.Enabled(),
 			"version", server.Version,
 			"store", cfg.Store.Enabled,
 			"ipinfo", cfg.IPInfo.Enabled)
-		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var err error
+		if cfg.TLS.Enabled() {
+			err = httpSrv.ListenAndServeTLS(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+		} else {
+			err = httpSrv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()

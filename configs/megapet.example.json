@@ -3,6 +3,16 @@
   "base_url": "https://megapet.internal.example",
   "trusted_proxies": ["10.0.0.0/8", "192.168.0.0/16", "127.0.0.1/32"],
 
+  "tls": {
+    "cert_file": "",
+    "key_file": ""
+  },
+
+  "direct": {
+    "enabled": false,
+    "url": ""
+  },
+
   "test": {
     "ping_count": 12,
     "ping_warmup": 2,

@@ -29,14 +29,16 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 
 // clientConfig is the payload the frontend boots from.
 type clientConfig struct {
-	Title        string        `json:"title"`
-	SeedColor    string        `json:"seed_color"`
-	ShowHistory  bool          `json:"show_history"`
-	AutoStart    bool          `json:"auto_start"`
-	StoreEnabled bool          `json:"store_enabled"`
-	Version      string        `json:"version"`
-	Test         config.Test   `json:"test"`
-	Servers      []config.Peer `json:"servers"`
+	Title        string `json:"title"`
+	SeedColor    string `json:"seed_color"`
+	ShowHistory  bool   `json:"show_history"`
+	AutoStart    bool   `json:"auto_start"`
+	StoreEnabled bool   `json:"store_enabled"`
+	// Empty unless the operator advertised an address that bypasses any proxy.
+	DirectURL string        `json:"direct_url"`
+	Version   string        `json:"version"`
+	Test      config.Test   `json:"test"`
+	Servers   []config.Peer `json:"servers"`
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +49,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		ShowHistory:  s.cfg.UI.ShowHistory && s.db != nil,
 		AutoStart:    s.cfg.UI.AutoStart,
 		StoreEnabled: s.db != nil,
+		DirectURL:    s.cfg.Direct.URL,
 		Version:      Version,
 		Test:         s.cfg.Test,
 		Servers:      s.cfg.Servers,

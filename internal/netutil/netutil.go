@@ -137,3 +137,81 @@ func String(a netip.Addr) string {
 	}
 	return a.String()
 }
+
+// PrimaryAddress returns this host's first routable unicast address, preferring
+// IPv4 because that is what a mixed LAN is most likely to reach.
+//
+// "Routable" here means not loopback and not link-local; it is a guess, and on
+// a multi-homed host it may guess wrong, which is why anything using it must
+// allow the address to be configured explicitly instead.
+func PrimaryAddress() (netip.Addr, bool) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return netip.Addr{}, false
+	}
+
+	var fallback netip.Addr
+	for _, a := range addrs {
+		prefix, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		addr, ok := netip.AddrFromSlice(prefix.IP)
+		if !ok {
+			continue
+		}
+		addr = addr.Unmap()
+		if !addr.IsGlobalUnicast() || addr.IsLoopback() || addr.IsLinkLocalUnicast() {
+			continue
+		}
+		if addr.Is4() {
+			return addr, true
+		}
+		if !fallback.IsValid() {
+			fallback = addr
+		}
+	}
+	return fallback, fallback.IsValid()
+}
+
+// DirectURL derives a URL that reaches this server without passing through a
+// reverse proxy, given the address it listens on.
+//
+// A wildcard listener carries no usable host, so the primary interface address
+// stands in for it.
+//
+// The scheme matters more than it looks: a page served over https cannot fetch
+// an http origin, so a direct address is only usable from an https page if the
+// server terminates TLS itself. Pass secure accordingly.
+func DirectURL(listen string, secure bool) (string, bool) {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil || port == "" {
+		return "", false
+	}
+
+	if host != "" && host != "0.0.0.0" && host != "::" && host != "[::]" {
+		if addr, err := netip.ParseAddr(host); err == nil {
+			if addr.IsUnspecified() {
+				host = ""
+			} else if addr.IsLoopback() {
+				// Reachable only from the server itself, so useless to advertise.
+				return "", false
+			}
+		}
+	} else {
+		host = ""
+	}
+
+	if host == "" {
+		addr, ok := PrimaryAddress()
+		if !ok {
+			return "", false
+		}
+		host = addr.String()
+	}
+	scheme := "http://"
+	if secure {
+		scheme = "https://"
+	}
+	return scheme + net.JoinHostPort(host, port), true
+}

@@ -45,3 +45,64 @@ they are unauthenticated and carry no credentials.
 ]
 ```
 
+## Measuring past a reverse proxy
+
+A proxy is the honest answer to *"how fast is this server for me"* — it is how
+clients actually reach it. It is the wrong answer to *"how fast is this link"*:
+every hop adds a copy per buffer, and with nginx's default `proxy_buffering on`
+a download can read an order of magnitude low, because you end up timing the
+proxy's disk rather than the network.
+
+`direct` advertises an address that bypasses it. The page still loads, and
+still saves its results, through the proxy; only ping, download and upload go
+straight to the server.
+
+```json
+"direct": {
+  "enabled": true,
+  "url": ""
+}
+```
+
+Leave `url` empty and it is derived from `listen` at startup — the primary
+interface address plus the listening port. That guesses on a multi-homed host,
+so set it explicitly if the guess is wrong:
+
+```json
+"direct": { "enabled": true, "url": "http://192.0.2.10:8080" }
+```
+
+The browser probes the address on load. If it answers it becomes the default
+and the menu shows **Direct**; if it does not — a firewall, a different
+network, a proxy that is the only route in — the page quietly stays on the
+proxy path, because that measurement is still valid, just of a different thing.
+A loopback listener advertises nothing, since it would send every client to
+itself.
+
+### The https catch
+
+**A page served over https cannot measure against an http address.** Browsers
+block it as mixed content, with no way for the page to detect or recover, so
+megapet does not offer the option at all in that case.
+
+If you terminate TLS at your proxy and still want the direct path, the server
+has to speak https itself:
+
+```json
+"tls":    { "cert_file": "/etc/megapet/direct.crt", "key_file": "/etc/megapet/direct.key" },
+"direct": { "enabled": true, "url": "https://speed-direct.example:8443" }
+```
+
+The certificate has to be one the browser already trusts — a self-signed one
+fails silently, exactly like mixed content. In practice that means a second
+hostname whose DNS points straight at the server rather than at the proxy.
+
+On a plain http LAN deployment none of this applies: enable `direct` and it
+works.
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `direct.enabled` | `false` | Advertise a proxy-bypassing address. |
+| `direct.url` | *(derived)* | Explicit address; overrides the guess. |
+| `tls.cert_file` | *(none)* | Serve https directly. Must be set with the key. |
+| `tls.key_file` | *(none)* | |

@@ -66,6 +66,11 @@ every published platform, with archives and checksums.
   colour, in light and dark, and the visitor can change it.
 - **Drop-in migration.** `/empty.php` and `/garbage.php` aliases mean existing
   LibreSpeed probes and bookmarks keep working while you move over.
+- **Measures past your proxy.** Optionally advertises a direct address, so the
+  page loads and saves results through nginx while ping, download and upload go
+  straight to the server — because a misconfigured proxy can understate a
+  download by an order of magnitude. See
+  [measuring past a reverse proxy](docs/configuration.md#measuring-past-a-reverse-proxy).
 - **Nookies.** The speed dial is geared to a lift: downloads send the car down
   the shaft, uploads wind it back up, and the reversal happens by crossing a
   belt — which Nookies does himself, with a lever. `make preview` renders the
