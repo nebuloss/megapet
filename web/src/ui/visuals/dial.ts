@@ -1,12 +1,12 @@
 import { icon, type IconName } from '../primitives/icons';
 import { TICKS, toFraction } from './scale';
-import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
+import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
 
 const CENTER = 100;
 const ARC_RADIUS = 74;
 const ARC_WIDTH = 15;
 const RING_RADIUS = 88;
-const LABEL_RADIUS = 99;
+const LABEL_RADIUS = 103; // clears the progress ring at 88 with five-digit labels
 const START_ANGLE = 225;
 const SWEEP = 270;
 
@@ -227,7 +227,11 @@ export class DialVisual implements SpeedVisual {
   }
 
   private paint(): void {
-    this.numberEl.textContent = readoutText(this.reading ?? this.shown, this.unit);
+    // The unit is chosen with the number, so a gigabit link reads 8.74 Gbps
+    // rather than 8741, and a slow one keeps its digits.
+    const reading = formatReadout(this.reading ?? this.shown, this.unit);
+    this.numberEl.textContent = reading.value;
+    if (this.unitEl.textContent !== reading.unit) this.unitEl.textContent = reading.unit;
     this.valueArc.setAttribute(
       'stroke-dashoffset',
       String(ARC_LENGTH * (1 - this.shownFraction)),

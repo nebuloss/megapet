@@ -28,6 +28,7 @@ const TILES: readonly TileSpec[] = [
  */
 export class StatTiles extends Component {
   private readonly values = new Map<StatKey, HTMLElement>();
+  private readonly units = new Map<StatKey, HTMLElement>();
   private readonly tiles = new Map<StatKey, HTMLElement>();
 
   constructor() {
@@ -35,22 +36,28 @@ export class StatTiles extends Component {
 
     for (const spec of TILES) {
       const value = el('div', { class: 'stat__value tnum' }, '—');
+      const unit = el('div', { class: 'stat__unit' }, spec.unit);
       const tile = el(
         'div',
         { class: 'stat', 'data-key': spec.key, 'data-active': 'false' },
         el('div', { class: 'stat__head', html: icon(spec.icon) }, el('span', {}, spec.label)),
         value,
-        el('div', { class: 'stat__unit' }, spec.unit),
+        unit,
       );
       this.values.set(spec.key, value);
+      this.units.set(spec.key, unit);
       this.tiles.set(spec.key, tile);
       this.root.append(tile);
     }
   }
 
-  set(key: StatKey, value: string): void {
+  /** `unit` follows the figure: a throughput tile changes unit as it grows. */
+  set(key: StatKey, value: string, unit?: string): void {
     const node = this.values.get(key);
     if (node) node.textContent = value;
+    if (unit === undefined) return;
+    const label = this.units.get(key);
+    if (label && label.textContent !== unit) label.textContent = unit;
   }
 
   /** Highlights the tile the current phase is filling in. */
@@ -61,7 +68,9 @@ export class StatTiles extends Component {
   }
 
   reset(): void {
-    for (const node of this.values.values()) node.textContent = '—';
+    // Units go back to their defaults too: a run that ended in Gbps must not
+    // leave the tile labelled Gbps above a dash.
+    for (const spec of TILES) this.set(spec.key, '—', spec.unit);
     this.setActive(null);
   }
 }

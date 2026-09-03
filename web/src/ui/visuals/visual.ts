@@ -1,4 +1,5 @@
 import type { View } from '../../core';
+import { formatMs, formatRate, type Rate } from '../primitives/format';
 import type { IconName } from '../primitives/icons';
 
 export type GaugeAccent = 'primary' | 'tertiary' | 'secondary';
@@ -68,10 +69,12 @@ export interface SpeedVisual extends View {
 }
 
 /** Formats a readout number according to its unit. */
-export function readoutText(value: number, unit: string): string {
-  if (!Number.isFinite(value) || value <= 0) return unit === 'ms' ? '—' : '0.00';
-  if (unit === 'ms') return value >= 100 ? value.toFixed(0) : value.toFixed(1);
-  if (value >= 100) return value.toFixed(0);
-  if (value >= 10) return value.toFixed(1);
-  return value.toFixed(2);
+export function formatReadout(value: number, unit: string): Rate {
+  if (unit === 'ms') {
+    const ms = !Number.isFinite(value) || value <= 0 ? '—' : formatMs(value);
+    return { value: ms, unit };
+  }
+  // Throughput picks its own unit, so the caller's 'Mbps' is only a hint that
+  // this is a speed rather than a time.
+  return formatRate(value);
 }

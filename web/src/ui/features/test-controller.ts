@@ -1,7 +1,7 @@
 import type { ApiClient, Submission } from '../../api';
 import type { Peer, StoredResult, TestParams } from '../../domain/types';
 import { SpeedTest, type Phase, type Snapshot } from '../../engine/runner';
-import { describePlatform, formatMs, formatSpeed } from '../primitives/format';
+import { describePlatform, formatMs, formatRate } from '../primitives/format';
 import type { IconName } from '../primitives/icons';
 import type { Drive, GaugeAccent, SpeedVisual } from '../visuals';
 import type { StatKey, StatTiles } from './stat-tiles';
@@ -21,6 +21,19 @@ interface PhaseStyle {
  * `reversing` is absent deliberately: its direction comes from the phase it is
  * setting up, so it cannot be described by a static entry.
  */
+/** Screen readers should hear the unit, not spell it. */
+const SPOKEN: Readonly<Record<string, string>> = {
+  Gbps: 'gigabits per second',
+  Mbps: 'megabits per second',
+  kbps: 'kilobits per second',
+  bps: 'bits per second',
+};
+
+function spoken(mbps: number): string {
+  const rate = formatRate(mbps);
+  return `${rate.value} ${SPOKEN[rate.unit] ?? rate.unit}`;
+}
+
 const PHASES: Partial<Record<Phase, PhaseStyle>> = {
   latency: {
     label: 'Latency', icon: 'latency', accent: 'secondary',
@@ -135,8 +148,8 @@ export class TestController {
 
     visual.setPhase('Complete', 'check');
     this.deps.announce(
-      `Test complete. Download ${formatSpeed(snapshot.downloadMbps)} megabits per second, ` +
-        `upload ${formatSpeed(snapshot.uploadMbps)}, ping ${formatMs(snapshot.pingMs)} milliseconds.`,
+      `Test complete. Download ${spoken(snapshot.downloadMbps)}, ` +
+        `upload ${spoken(snapshot.uploadMbps)}, ping ${formatMs(snapshot.pingMs)} milliseconds.`,
     );
     await this.persist(snapshot, peer);
   }
@@ -188,8 +201,10 @@ export class TestController {
 
     visual.setReading(null, 'Mbps');
     visual.setPosition(snapshot.liveMbps);
-    this.deps.stats.set('download', formatSpeed(snapshot.downloadMbps));
-    this.deps.stats.set('upload', formatSpeed(snapshot.uploadMbps));
+    const down = formatRate(snapshot.downloadMbps);
+    const up = formatRate(snapshot.uploadMbps);
+    this.deps.stats.set('download', down.value, down.unit);
+    this.deps.stats.set('upload', up.value, up.unit);
     this.deps.stats.set('ping', formatMs(snapshot.pingMs));
     this.deps.stats.set('jitter', formatMs(snapshot.jitterMs));
   }

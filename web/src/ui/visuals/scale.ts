@@ -26,8 +26,8 @@ export const TICKS: ReadonlyArray<readonly [value: number, label: string]> = [
   [1, '1'],
   [10, '10'],
   [100, '100'],
-  [1000, '1k'],
-  [10000, '10k'],
+  [1000, '1000'],
+  [10000, '10000'],
 ];
 
 /**

@@ -36,7 +36,9 @@ export const SWEEP_RAD = toRadians(SWEEP);
 /** Needle turns to sheave turns: one gear mesh, then the belt at 1:1. */
 export const DRIVE_RATIO = HUB.teeth / LAY.teeth;
 
-export const DIAL = { radius: 68, width: 10, ringRadius: 77, labelRadius: 88 };
+// labelRadius clears the progress ring at 77: the widest label is five digits,
+// and at 88 its inner corner fell 3.4 units inside the ring.
+export const DIAL = { radius: 68, width: 10, ringRadius: 77, labelRadius: 92 };
 export const NEEDLE_LENGTH = 58;
 export const ARC_LENGTH = 2 * Math.PI * DIAL.radius * (SWEEP / 360);
 export const RING_LENGTH = 2 * Math.PI * DIAL.ringRadius * (SWEEP / 360);

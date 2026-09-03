@@ -305,6 +305,7 @@
 .gauge__tick-label {
   fill: var(--md-sys-color-on-surface-variant);
   font: var(--md-sys-typescale-label-small);
+  font-size: 9.5px;
   text-anchor: middle;
 }
 
@@ -802,6 +803,9 @@
 .lift__dial-label {
   fill: var(--md-sys-color-on-surface-variant);
   font: var(--md-sys-typescale-label-small);
+  /* Set after the shorthand: five digits at label-small would not fit between
+     the progress ring and the edge of the canvas. */
+  font-size: 9.5px;
   text-anchor: middle;
 }
 

@@ -1,3 +1,35 @@
+/** A throughput figure and the unit it is quoted in. */
+export interface Rate {
+  readonly value: string;
+  readonly unit: string;
+}
+
+/**
+ * Steps of the unit ladder, largest first. Each covers three decades of the
+ * one below, so a figure never falls off either end of its precision.
+ */
+const RATE_STEPS: ReadonlyArray<{ from: number; scale: number; unit: string }> = [
+  { from: 1000, scale: 1e-3, unit: 'Gbps' },
+  { from: 1, scale: 1, unit: 'Mbps' },
+  { from: 1e-3, scale: 1e3, unit: 'kbps' },
+  { from: 0, scale: 1e6, unit: 'bps' },
+];
+
+/**
+ * Renders a throughput figure with a unit that suits its size.
+ *
+ * Pinned to Mbps, a ten-gigabit link reads 8741 — five digits nobody takes in
+ * at a glance — and a slow phone line reads 0.42, with barely a digit of
+ * precision left. The ladder keeps three or four significant figures across
+ * the whole range, from a few bits per second to tens of gigabits.
+ */
+export function formatRate(mbps: number): Rate {
+  if (!Number.isFinite(mbps) || mbps <= 0) return { value: '0.00', unit: 'Mbps' };
+  const step = RATE_STEPS.find((s) => mbps >= s.from) ?? RATE_STEPS[RATE_STEPS.length - 1]!;
+  const value = mbps * step.scale;
+  return { value: formatSpeed(value), unit: step.unit };
+}
+
 /** Renders a throughput figure with the precision a reader can actually use. */
 export function formatSpeed(mbps: number): string {
   if (!Number.isFinite(mbps) || mbps <= 0) return '—';

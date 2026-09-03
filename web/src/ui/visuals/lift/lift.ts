@@ -15,7 +15,7 @@ import {
 import { approach, easeInOut, easeOutBack, stage } from '../../primitives/anim';
 import { icon, type IconName } from '../../primitives/icons';
 import { toFraction } from '../scale';
-import { readoutText, type Drive, type GaugeAccent, type SpeedVisual } from '../visual';
+import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from '../visual';
 import {
   ARC_LENGTH,
   BRAKE,
@@ -230,10 +230,7 @@ export class LiftVisual implements SpeedVisual {
 
   setReading(value: number | null, unit: string): void {
     this.reading = value;
-    if (unit !== this.unit) {
-      this.unit = unit;
-      this.unitEl.textContent = unit;
-    }
+    this.unit = unit;
     this.paint();
   }
 
@@ -611,6 +608,10 @@ export class LiftVisual implements SpeedVisual {
     this.root.style.setProperty('--lift-effort', fraction.toFixed(3));
     this.root.style.setProperty('--nookie-bob', `${(2.6 - fraction * 1.8).toFixed(2)}s`);
     this.root.style.setProperty('--streak-duration', `${(1.5 - fraction * 1.15).toFixed(2)}s`);
-    this.numberEl.textContent = readoutText(this.reading ?? this.shown, this.unit);
+    // The unit is chosen with the number, so a gigabit link reads 8.74 Gbps
+    // rather than 8741, and a slow one keeps its digits.
+    const reading = formatReadout(this.reading ?? this.shown, this.unit);
+    this.numberEl.textContent = reading.value;
+    if (this.unitEl.textContent !== reading.unit) this.unitEl.textContent = reading.unit;
   }
 }
