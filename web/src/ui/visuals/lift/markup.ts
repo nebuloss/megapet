@@ -1,6 +1,6 @@
 /** The scene's SVG. Everything that moves carries a class the scene can find. */
 import { gearOutline, polar, toRadians, type Gear } from '../../../mech';
-import { TICKS, toFraction } from '../scale';
+import { TICKS, UNIT, toFraction } from '../scale';
 import { nookieMarkup } from './nookie';
 import {
   ARC_LENGTH,
@@ -112,6 +112,7 @@ export function liftMarkup(clipId: string): string {
         stroke-dasharray="${RING_LENGTH.toFixed(2)} ${RING_LENGTH.toFixed(2)}"
         stroke-dashoffset="${RING_LENGTH.toFixed(2)}"/>
   ${dialTicks}
+  <text class="lift__dial-unit" x="${HUB.x}" y="${(HUB.y + 30).toFixed(1)}">${UNIT}</text>
 
   <rect class="lift__shaft-fill" x="${SHAFT.x}" y="${SHAFT.y}" width="${SHAFT.w}" height="${SHAFT.h}" rx="12"/>
   <g clip-path="url(#${clipId})">

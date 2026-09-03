@@ -805,6 +805,16 @@
   text-anchor: middle;
 }
 
+/* Printed on the face, the way an instrument names what it is counting. The
+   needle sweeps over it, which is exactly what happens on a real dial. */
+.lift__dial-unit {
+  fill: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-small);
+  text-anchor: middle;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
 .lift__needle {
   fill: var(--md-sys-color-error);
   stroke: none;
