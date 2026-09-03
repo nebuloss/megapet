@@ -37,28 +37,38 @@ them back here before syncing again or the change is lost.
   of them. It knows nothing about the speedtest and is covered by unit tests
   (`npm test` in `web/`). Ratios here are tooth counts, never radii, and every
   gear is cut to one module — mixing modules is what makes teeth stop lining up.
-- `web/src/ui/lift` — the hero visual. The needle drives one gear pair that
-  never leaves mesh, and that drives the sheave through a belt; crossing the
-  belt is what reverses the lift. Do not reintroduce a gear that swings in and
-  out of mesh: at this scale an idler bridging two gears is wider than the gap
-  it would have to leave through, so it gets drawn straight through its
-  neighbours. `layout.ts` is the scene, `markup.ts` the SVG, `index.ts` the
-  state and the throw's stages. `web/src/ui/gauge.ts` is the alternative plain
-  dial. Both satisfy `SpeedVisual`.
+- `web/src/ui/visuals/lift` — the hero visual. The needle drives one gear pair
+  that never leaves mesh, and that drives the sheave through a belt; crossing
+  the belt is what reverses the lift. Do not reintroduce a gear that swings in
+  and out of mesh: at this scale an idler bridging two gears is wider than the
+  gap it would have to leave through, so it gets drawn straight through its
+  neighbours. `layout.ts` is the scene, `markup.ts` the SVG, `lift.ts` the
+  state and the shift's stages. `web/src/ui/visuals/dial.ts` is the alternative
+  plain dial. Both satisfy `SpeedVisual`.
+- The run has a shape, and the phases are paced to fit it: the car rests at the
+  ground floor, is called up the shaft while the ping is taken, carries the
+  download down, the upload up, and comes home when the results are in. The
+  visual tells the runner how long to hold each part through `Pacing` —
+  `settleMs()` before the probes, `open()` for the ride during them, and
+  `transitionMs` for a reversal. Do not shorten a hold below the move it
+  covers; the needle drives the car through the belt, so anything the machine
+  is doing has to outlast whatever the needle is doing.
 - The car's position is **carried state**, never computed from the reading. A
   formula like `anchor + sign * fraction * travel` teleports the car the moment
   `sign` flips, because the eased reading has not caught up yet. The rule lives
   in `web/src/ui/visuals/lift/carriage.ts` as a pure function, and
   `carriage.test.ts` simulates whole runs and fails if any single frame moves
   the car further than the needle's easing allows. The machine takes the car
-  over in two places — home to the top before a run, and into a floor when a
-  leg ends — and the belt has no say while it does. A reversal queues behind
-  the landing, so `transitionMs` covers `LAND_MS + SHIFT_MS`.
+  over whenever it moves it itself — home before a run, called up the shaft,
+  into a floor when a leg ends, back to the ground floor after — and the belt
+  has no say while it does. A reversal queues behind the landing, so
+  `transitionMs` covers `LAND_MS + SHIFT_MS`.
 - The dial scale is **logarithmic**, so animate the fraction, never the Mbps.
   Easing the value and converting per frame swept the needle across half the
   dial in the first frame of every phase.
-- `web/src/theme.ts` — generates every `--md-sys-color-*` token from one seed.
-  Stylesheets must only ever read those tokens, never hard-code a colour.
+- `web/src/ui/theme/controller.ts` — generates every `--md-sys-color-*` token
+  from one seed. Stylesheets must only ever read those tokens, never hard-code
+  a colour.
 
 ## Commands
 

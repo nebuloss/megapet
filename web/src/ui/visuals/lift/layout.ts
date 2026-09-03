@@ -50,6 +50,15 @@ export const TRAVEL = DRIVE_RATIO * SWEEP_RAD * SHEAVE.radius;
 // window vertically and 57% of it across.
 export const CAR = { w: 60, h: 70, x: SHEAVE.x - SHEAVE.radius, top: 206 };
 export const CAR_BOTTOM = CAR.top + TRAVEL;
+
+/**
+ * The ground floor: where the car sits between runs.
+ *
+ * A lift at rest waits at the bottom, not hanging at the top of its shaft, and
+ * it gives the run a shape — called up while the ping is taken, down for the
+ * download, up for the upload, home again when the results are in.
+ */
+export const CAR_REST = CAR_BOTTOM;
 export const WEIGHT = { w: 20, h: 38, x: SHEAVE.x + SHEAVE.radius, low: 300 };
 export const SHAFT = { x: 74, y: 200, w: 118, h: 172 };
 
@@ -141,8 +150,21 @@ export const EASE_TAU = 110;
  */
 export const RETURN_MS = 1600;
 
-/** How long the machine takes to return the car to the top floor before a run. */
+/** How long the machine takes to return the car to its floor before a run. */
 export const HOME_MS = 900;
+
+/**
+ * A full-shaft journey at lift speed. Shorter trips take proportionally less,
+ * so the car moves at one speed rather than always taking the same time —
+ * which is what makes a long ride read as a ride rather than a jump.
+ */
+export const RIDE_FULL_MS = 2400;
+const RIDE_MIN_MS = 300;
+
+/** How long the car takes to travel `distance`, at lift speed. */
+export function rideMs(distance: number): number {
+  return Math.max(RIDE_MIN_MS, Math.round((distance / TRAVEL) * RIDE_FULL_MS));
+}
 
 /**
  * How long the car takes to finish its run into a floor when a phase ends.

@@ -87,13 +87,14 @@ export class TestController {
     setRunning(true);
 
     const base = peer ? this.deps.api.withBase(peer.url) : this.deps.api;
-    // settleMs() is asked after reset(), so it reports the move reset started.
-    this.test = new SpeedTest(
-      this.deps.params,
-      base.url(''),
-      target.transitionMs,
-      target.settleMs(),
-    );
+    // Both are asked after reset(), so they describe the moves it just began.
+    // open() starts the car up the shaft; it queues behind the settle, so the
+    // ping is taken while the car rides rather than while the needle falls.
+    this.test = new SpeedTest(this.deps.params, base.url(''), {
+      openingMs: target.settleMs(),
+      latencyMs: target.open(),
+      reverseMs: target.transitionMs,
+    });
 
     let lastPhase: Phase = 'idle';
     const snapshot = await this.test.run((s) => {
@@ -117,6 +118,9 @@ export class TestController {
     visual: SpeedVisual,
     peer: Peer | null,
   ): Promise<void> {
+    // However the run ended, the machine returns the car to the ground floor.
+    // Nothing waits for it: the results are read while the car comes home.
+    visual.park();
     if (snapshot.phase === 'error') {
       visual.setPhase('Failed', 'close');
       this.deps.announce('The test failed.');
@@ -129,8 +133,6 @@ export class TestController {
       return;
     }
 
-    // Nothing reverses after the upload, so the last leg is landed here.
-    visual.land();
     visual.setPhase('Complete', 'check');
     this.deps.announce(
       `Test complete. Download ${formatSpeed(snapshot.downloadMbps)} megabits per second, ` +

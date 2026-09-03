@@ -129,6 +129,14 @@ export class DialVisual implements SpeedVisual {
     return 0;
   }
 
+  /** No car to call up, so the latency phase is not held open for one. */
+  open(): number {
+    return 0;
+  }
+
+  /** Nothing travels, so there is nothing to bring home. */
+  park(): void {}
+
   setPosition(mbps: number): void {
     this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     this.startAnimation();

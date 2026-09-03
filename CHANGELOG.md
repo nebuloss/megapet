@@ -7,6 +7,17 @@ versions follow [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+### Changed
+
+- The lift now rests at the ground floor rather than hanging at the top of its
+  shaft, and the run has a shape to match: the car is called up while the ping
+  is taken, carries the download down, the upload up, and comes home once the
+  results are in. Journeys run at one speed, so a long ride reads as a ride.
+- The needle's return to its stop between phases is slower again, 1600ms.
+- Latency probes are no longer measured underneath the opening animation. A
+  ping on a local link is a millisecond or two, small enough that one janked
+  frame outweighs it, so the visual's settling move is allowed to finish first.
+
 ## 1.1.0 — 2026-09-03
 
 ### Added

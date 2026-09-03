@@ -39,6 +39,15 @@ export interface SpeedVisual extends View {
    * a download arrives at the bottom and an upload at the top.
    */
   land(): void;
+  /**
+   * Plays the opening move for a run and says how long it lasts, in ms.
+   *
+   * Called as the latency phase begins. The runner holds that phase open for
+   * at least this long, so the move is not cut off by the reversal behind it.
+   */
+  open(): number;
+  /** Returns to the resting position once the run is over. */
+  park(): void;
   /** Returns to the resting state before a new run. */
   reset(): void;
   /**

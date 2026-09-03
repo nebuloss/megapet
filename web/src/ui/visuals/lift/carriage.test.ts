@@ -5,12 +5,15 @@ import { carriageTop, type CarriageInput } from './carriage';
 import {
   CAR,
   CAR_BOTTOM,
+  CAR_REST,
   EASE_TAU,
   HOME_MS,
   LAND_MS,
   RETURN_MS,
+  RIDE_FULL_MS,
   SHIFT_MS,
   TRAVEL,
+  rideMs,
 } from './layout';
 
 const FRAME_MS = 16;
@@ -26,11 +29,10 @@ const MAX_STEP = (1 - Math.exp(-FRAME_MS / EASE_TAU)) * TRAVEL;
 /**
  * How close to a floor counts as landed.
  *
- * Not exactly on it: the belt stays connected, so once the landing hands back
- * to the drive the last of the needle's decay nudges the car a fraction of a
- * unit. That is the mechanism behaving correctly, and it is about two
- * thousandths of a pixel on a shaft that renders under a pixel per unit — the
- * brake sets immediately afterwards anyway.
+ * Not exactly on it: the belt stays connected, so once a scripted move hands
+ * back to the drive the last of the needle's decay nudges the car a fraction
+ * of a unit. That is the mechanism behaving correctly, and it is about two
+ * thousandths of a pixel on a shaft that renders under a pixel per unit.
  */
 const ON_THE_FLOOR = 0.01;
 
@@ -45,20 +47,24 @@ interface Machine {
   glideMs: number;
   glideFrom: number;
   glideTo: number;
+  pendingRide: number | null;
+  pendingRideMs: number;
   pendingShift: (() => void) | null;
 }
 
 function machine(): Machine {
   return {
-    top: CAR.top,
+    top: CAR_REST,
     shown: 0,
     lastFraction: 0,
     driveSign: -1,
     shiftT: 1,
     glideT: 1,
     glideMs: HOME_MS,
-    glideFrom: CAR.top,
-    glideTo: CAR.top,
+    glideFrom: CAR_REST,
+    glideTo: CAR_REST,
+    pendingRide: null,
+    pendingRideMs: 0,
     pendingShift: null,
   };
 }
@@ -69,9 +75,14 @@ function frame(m: Machine, target: number): number {
   if (m.shiftT < 1) m.shiftT = Math.min(1, m.shiftT + FRAME_MS / SHIFT_MS);
   if (m.glideT < 1) {
     m.glideT = Math.min(1, m.glideT + FRAME_MS / m.glideMs);
-    if (m.glideT === 1 && m.pendingShift) {
-      m.pendingShift();
-      m.pendingShift = null;
+    if (m.glideT === 1) {
+      if (m.pendingRide !== null) {
+        glide(m, m.pendingRide, m.pendingRideMs);
+        m.pendingRide = null;
+      } else if (m.pendingShift) {
+        m.pendingShift();
+        m.pendingShift = null;
+      }
     }
   }
 
@@ -108,6 +119,19 @@ function glide(m: Machine, to: number, ms: number): void {
   m.glideT = Math.abs(to - m.top) < 0.5 ? 1 : 0;
 }
 
+/** A journey at lift speed, queued behind whatever the machine is doing. */
+function ride(m: Machine, to: number): number {
+  const busy = m.glideT < 1;
+  const ms = rideMs(Math.abs(to - (busy ? m.glideTo : m.top)));
+  if (busy) {
+    m.pendingRide = to;
+    m.pendingRideMs = ms;
+  } else {
+    glide(m, to, ms);
+  }
+  return ms;
+}
+
 /** What the controller does when a leg ends: run the car into its floor. */
 function land(m: Machine): void {
   glide(m, m.driveSign > 0 ? CAR_BOTTOM : CAR.top, LAND_MS);
@@ -127,28 +151,30 @@ function reverse(m: Machine, drive: 'up' | 'down'): void {
   else m.pendingShift = settle;
 }
 
-/** What `reset()` does: aim at zero and drive the car home from where it is. */
+/** What `reset()` does: aim at zero and hold the car at its floor as it falls. */
 function reset(m: Machine): void {
   m.driveSign = -1;
   m.pendingShift = null;
+  m.pendingRide = null;
   m.shiftT = 1;
-  glide(m, CAR.top, HOME_MS);
+  glide(m, CAR_REST, RETURN_MS);
   m.glideT = 0;
 }
 
-/** Latency, then download, then upload — the shape of one test run. */
+/** The whole run: settle, called up during the ping, down, up, home again. */
 function run(m: Machine, downloadMbps: number, uploadMbps: number): number {
   let worst = 0;
   reset(m);
-  worst = Math.max(worst, hold(m, 0, 1200)); // latency
+  const opening = ride(m, CAR.top); // queued behind the settle
+  worst = Math.max(worst, hold(m, 0, RETURN_MS + opening + 200));
   reverse(m, 'down');
-  worst = Math.max(worst, hold(m, 0, SHIFT_MS + 250));
+  worst = Math.max(worst, hold(m, 0, LAND_MS + SHIFT_MS + 250));
   worst = Math.max(worst, hold(m, downloadMbps, 8000));
   reverse(m, 'up');
-  worst = Math.max(worst, hold(m, 0, SHIFT_MS + 250));
+  worst = Math.max(worst, hold(m, 0, LAND_MS + SHIFT_MS + 250));
   worst = Math.max(worst, hold(m, uploadMbps, 8000));
-  land(m); // no reversal after the upload, so the controller lands it
-  worst = Math.max(worst, hold(m, 0, LAND_MS + 200));
+  ride(m, CAR_REST); // park, once the results are in
+  worst = Math.max(worst, hold(m, uploadMbps, RIDE_FULL_MS + 200));
   return worst;
 }
 
@@ -158,12 +184,36 @@ describe('carriageTop', () => {
     expect(run(m, 940, 780)).toBeLessThanOrEqual(MAX_STEP);
   });
 
-  it('never jumps when a second run resets a car left down the shaft', () => {
+  it('starts and ends the run at the ground floor', () => {
+    const m = machine();
+    expect(m.top).toBe(CAR_REST);
+    run(m, 940, 780);
+    expect(Math.abs(m.top - CAR_REST)).toBeLessThan(ON_THE_FLOOR);
+  });
+
+  it('is called all the way up while the ping is taken', () => {
+    const m = machine();
+    reset(m);
+    const opening = ride(m, CAR.top);
+    hold(m, 0, RETURN_MS - FRAME_MS);
+    // Still at the bottom: the ride waits for the needle to finish falling.
+    expect(Math.abs(m.top - CAR_REST)).toBeLessThan(ON_THE_FLOOR);
+    hold(m, 0, opening + 2 * FRAME_MS);
+    expect(Math.abs(m.top - CAR.top)).toBeLessThan(ON_THE_FLOOR);
+  });
+
+  it('rides at one speed, so a longer trip takes longer', () => {
+    expect(rideMs(TRAVEL)).toBe(RIDE_FULL_MS);
+    expect(rideMs(TRAVEL / 2)).toBe(RIDE_FULL_MS / 2);
+    expect(rideMs(0)).toBeGreaterThan(0); // a floor, so nothing is instant
+  });
+
+  it('never jumps when a second run resets a car left up the shaft', () => {
     const m = machine();
     run(m, 940, 780);
     // Leave it stopped mid-shaft with the needle still reading, the state a
-    // cancelled test ends in — the case that used to teleport it to the top.
-    m.top = CAR_BOTTOM;
+    // cancelled test ends in — the case that used to teleport it.
+    m.top = CAR.top;
     m.shown = toFraction(940);
     m.lastFraction = toFraction(940);
     expect(run(m, 620, 450)).toBeLessThanOrEqual(MAX_STEP);
@@ -172,6 +222,7 @@ describe('carriageTop', () => {
   it('runs a download into the bottom floor, not wherever the reading stopped', () => {
     const m = machine();
     m.glideT = 1;
+    m.top = CAR.top;
     m.driveSign = 1;
     hold(m, 940, 6000);
     // 940 Mbps on a scale that goes to ten gigabits: three quarters down.
@@ -196,6 +247,7 @@ describe('carriageTop', () => {
   it('lands smoothly, never faster than the needle could drive it', () => {
     const m = machine();
     m.glideT = 1;
+    m.top = CAR.top;
     m.driveSign = 1;
     land(m); // the longest possible landing: the whole shaft, from rest
     let worst = 0;
@@ -207,6 +259,7 @@ describe('carriageTop', () => {
   it('does not shift the reversing gear until the car has stopped', () => {
     const m = machine();
     m.glideT = 1;
+    m.top = CAR.top;
     m.driveSign = 1;
     hold(m, 940, 6000);
     reverse(m, 'up');
@@ -216,15 +269,6 @@ describe('carriageTop', () => {
     hold(m, 0, LAND_MS + FRAME_MS);
     expect(Math.abs(m.top - CAR_BOTTOM)).toBeLessThan(ON_THE_FLOOR);
     expect(m.shiftT).toBeLessThan(1); // and only now does it cross
-  });
-
-  it('lands exactly on the top floor when homing finishes', () => {
-    const m = machine();
-    m.top = CAR_BOTTOM;
-    reset(m);
-    hold(m, 0, HOME_MS + FRAME_MS);
-    expect(m.glideT).toBe(1);
-    expect(m.top).toBeCloseTo(CAR.top, 3);
   });
 
   it('holds the car still while the belt is being crossed', () => {
@@ -243,7 +287,7 @@ describe('carriageTop', () => {
 
   it('holds the car for at least as long as the needle takes to fall', () => {
     // The needle turns the sheave through the belt, so a return sweep that
-    // outlasts the machine's hold on the car would drag it back up the shaft.
+    // outlasts the machine's hold on the car would drag it up the shaft.
     // Between phases the hold is the landing plus the whole belt shift; at a
     // reset it is the homing glide, which is started with RETURN_MS by name.
     expect(LAND_MS + SHIFT_MS).toBeGreaterThanOrEqual(RETURN_MS);
@@ -252,6 +296,7 @@ describe('carriageTop', () => {
   it('stays within the shaft', () => {
     const m = machine();
     m.glideT = 1;
+    m.top = CAR.top;
     m.driveSign = 1;
     for (let i = 0; i < 400; i += 1) frame(m, 10_000);
     expect(m.top).toBeLessThanOrEqual(CAR_BOTTOM);

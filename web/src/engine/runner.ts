@@ -55,6 +55,16 @@ export function emptySnapshot(): Snapshot {
   };
 }
 
+/** How long the mounted visual asks each part of the run to be held open. */
+export interface Pacing {
+  /** Before the first latency probe, so a settling move has the frames alone. */
+  readonly openingMs?: number;
+  /** After the probes, so the visual's opening ride finishes inside the phase. */
+  readonly latencyMs?: number;
+  /** Between phases, while the drive is reversed. */
+  readonly reverseMs?: number;
+}
+
 export class SpeedTest {
   private controller = new AbortController();
   private snapshot = emptySnapshot();
@@ -68,14 +78,15 @@ export class SpeedTest {
    * loading the link.
    *
    * `openingMs` is the same idea at the front, for the opposite reason: the
-   * visual's opening move gets the main thread to itself so it cannot land in
-   * the middle of the latency probes.
+   * visual's settling move gets the main thread to itself so it cannot land in
+   * the middle of the latency probes. `latencyMs` then holds the phase open
+   * afterwards, so a visual with something to play during the ping — a lift
+   * being called up the shaft — is not cut off by the reversal behind it.
    */
   constructor(
     private readonly params: TestParams,
     private readonly base = '',
-    private readonly reverseMs = 0,
-    private readonly openingMs = 0,
+    private readonly pacing: Pacing = {},
   ) {}
 
   get isRunning(): boolean {
@@ -111,7 +122,8 @@ export class SpeedTest {
       // A ping on a local link is a millisecond or two, small enough that one
       // janked frame outweighs the thing being measured. So the visual's
       // opening move is allowed to finish before the first probe goes out.
-      if (this.openingMs > 0) await sleep(this.openingMs, signal);
+      if (this.pacing.openingMs) await sleep(this.pacing.openingMs, signal);
+      const openedAt = performance.now();
       const latency: LatencyResult = await measureLatency({
         base: this.base,
         count: this.params.ping_count,
@@ -134,6 +146,13 @@ export class SpeedTest {
         jitterMs: latency.jitter,
         liveMbps: 0,
       });
+      // The probes are done, but the visual may still be playing something —
+      // the car being called up the shaft — and the reversal must not cut it
+      // off. Elapsed probe time counts towards it, so a slow link waits less.
+      const played = performance.now() - openedAt;
+      const remaining = (this.pacing.latencyMs ?? 0) - played;
+      if (remaining > 0) await sleep(remaining, signal);
+      this.throwIfAborted(signal);
 
       // ---- reverse, then download ----------------------------------------
       await this.reverse('download', WEIGHTS.latency, emit, signal);
@@ -213,9 +232,9 @@ export class SpeedTest {
     emit: (patch: Partial<Snapshot>) => void,
     signal: AbortSignal,
   ): Promise<void> {
-    if (this.reverseMs <= 0) return;
+    if (!this.pacing.reverseMs || this.pacing.reverseMs <= 0) return;
     emit({ phase: 'reversing', nextPhase: next, liveMbps: 0, progress });
-    await sleep(this.reverseMs, signal);
+    await sleep(this.pacing.reverseMs, signal);
     this.throwIfAborted(signal);
   }
 

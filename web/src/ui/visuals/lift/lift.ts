@@ -21,12 +21,14 @@ import {
   BRAKE,
   CAR,
   CAR_BOTTOM,
+  CAR_REST,
   DRIVE,
   DRIVEN,
   EASE_TAU,
   HOME_MS,
   LAND_MS,
   RETURN_MS,
+  rideMs,
   FORK,
   HUB,
   LAY,
@@ -117,11 +119,11 @@ export class LiftVisual implements SpeedVisual {
    *  the frame loop stays free of transcendental maths. */
   private aimFraction = 0;
 
-  private carTop = CAR.top;
+  private carTop = CAR_REST;
   private driveSign = -1;
 
   /**
-   * Progress of the return to the top floor before a run, 0..1; 1 when idle.
+   * Progress of a move the machine is making itself, 0..1; 1 when idle.
    *
    * Resetting used to assign carTop and shown directly, which teleported the
    * car and snapped the needle the moment Start was pressed on a second run.
@@ -130,8 +132,8 @@ export class LiftVisual implements SpeedVisual {
    * at the end of a phase uses the same mechanism with a different floor.
    */
   private glideT = 1;
-  private glideFrom = CAR.top;
-  private glideTo = CAR.top;
+  private glideFrom = CAR_REST;
+  private glideTo = CAR_REST;
   private glideMs = HOME_MS;
 
   /** A scripted sweep of the needle back to its stop, 0..1; 1 when idle. */
@@ -141,6 +143,9 @@ export class LiftVisual implements SpeedVisual {
 
   /** A direction change waiting for the car to stop before the gear is shifted. */
   private pendingDrive: Drive | null = null;
+  /** A journey waiting for the machine to finish what it is already doing. */
+  private pendingRide: number | null = null;
+  private pendingRideMs = 0;
 
   private shiftT = 1;
   private cross = CROSS_FOR.up;
@@ -267,6 +272,44 @@ export class LiftVisual implements SpeedVisual {
     this.startGlide(floor, LAND_MS);
   }
 
+  /**
+   * Calls the car up to the top of the shaft, and says how long it will take.
+   *
+   * This runs while the ping is taken: the phase is otherwise a still picture,
+   * and a lift being called up is what a lift does before it carries anything.
+   */
+  open(): number {
+    return this.ride(CAR.top);
+  }
+
+  /** Returns the car to the ground floor once the run is over. */
+  park(): void {
+    this.ride(CAR_REST);
+  }
+
+  /**
+   * A journey at lift speed, queued behind whatever the machine is already
+   * doing rather than cutting it short. Returns how long it will take.
+   */
+  private ride(to: number): number {
+    const busy = this.glideT < 1;
+    const from = busy ? this.glideTo : this.carTop;
+    const ms = rideMs(Math.abs(to - from));
+    if (this.reducedMotion.matches) {
+      this.carTop = to;
+      this.paint();
+      return 0;
+    }
+    if (busy) {
+      this.pendingRide = to;
+      this.pendingRideMs = ms;
+      this.startLoop();
+    } else {
+      this.startGlide(to, ms);
+    }
+    return ms;
+  }
+
   settleMs(): number {
     const home = this.glideT < 1 ? (1 - this.glideT) * this.glideMs : 0;
     const swing = this.returnT < 1 ? (1 - this.returnT) * RETURN_MS : 0;
@@ -313,20 +356,21 @@ export class LiftVisual implements SpeedVisual {
       this.shown = 0;
       this.shownFraction = 0;
       this.lastFraction = 0;
-      this.carTop = CAR.top;
+      this.carTop = CAR_REST;
       this.glideT = 1;
     } else {
       if (this.shownFraction > 0) {
         // The needle's fall to the stop turns the sheave through the belt, so
         // the machine holds the car for exactly as long as the fall lasts —
         // even when the car is already home and has nowhere to go.
-        this.startGlide(CAR.top, RETURN_MS);
+        this.startGlide(CAR_REST, RETURN_MS);
         this.glideT = 0;
       } else {
-        this.startGlide(CAR.top, HOME_MS);
+        this.startGlide(CAR_REST, HOME_MS);
       }
     }
     this.pendingDrive = null;
+    this.pendingRide = null;
     this.shiftT = 1;
     this.root.dataset.shifting = 'false';
     this.startLoop();
@@ -407,7 +451,15 @@ export class LiftVisual implements SpeedVisual {
       }
       if (this.glideT < 1) {
         this.glideT = Math.min(1, this.glideT + dt / this.glideMs);
-        if (this.glideT === 1 && this.pendingDrive) this.beginShift(this.pendingDrive);
+        if (this.glideT === 1) {
+          if (this.pendingRide !== null) {
+            const to = this.pendingRide;
+            this.pendingRide = null;
+            this.startGlide(to, this.pendingRideMs);
+          } else if (this.pendingDrive) {
+            this.beginShift(this.pendingDrive);
+          }
+        }
       }
 
       const settled =
@@ -415,6 +467,7 @@ export class LiftVisual implements SpeedVisual {
         this.shiftT === 1 &&
         this.glideT === 1 &&
         this.returnT === 1 &&
+        this.pendingRide === null &&
         !this.pendingDrive;
       if (settled) {
         this.shown = this.target;
