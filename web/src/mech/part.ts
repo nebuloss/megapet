@@ -106,6 +106,50 @@ export class Derived implements Part {
   }
 }
 
+/**
+ * A part that says where it is by setting one attribute of itself.
+ *
+ * A rope drawn as a line ends wherever the thing it is tied to has got to, and
+ * an arc drawn as a dash offset shows however much of itself the reading has
+ * uncovered. Neither is a transform, and both are still just a part answering
+ * the same question.
+ */
+export class Attribute implements Part {
+  constructor(
+    readonly name: string,
+    private readonly attribute: string,
+    private readonly at: () => string,
+  ) {}
+
+  place(scene: Scene): void {
+    scene.attr(this.name, this.attribute, this.at());
+  }
+}
+
+/** A condition of the machine, for the stylesheet to respond to. */
+export class Flag implements Part {
+  constructor(
+    readonly name: string,
+    private readonly on: () => boolean,
+  ) {}
+
+  place(scene: Scene): void {
+    scene.flag(this.name, this.on());
+  }
+}
+
+/** A quantity the stylesheet reads, such as how hard the machine is working. */
+export class Quantity implements Part {
+  constructor(
+    readonly name: string,
+    private readonly at: () => string,
+  ) {}
+
+  place(scene: Scene): void {
+    scene.quantity(this.name, this.at());
+  }
+}
+
 /** Records what a machine did, so a test can look at it without a document. */
 export class RecordingScene implements Scene {
   readonly transforms = new Map<string, string>();

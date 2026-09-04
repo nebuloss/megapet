@@ -121,6 +121,17 @@ describe('the car', () => {
     expect(done).toEqual([0, 1, 2]);
   });
 
+  it('drops queued work, so a new run does not inherit the last one', () => {
+    const car = new Car(CAR.top);
+    const done: string[] = [];
+    car.rideTo(CAR_REST);
+    car.order(() => done.push('shift'));
+    car.clear();
+    run(car, RIDE_FULL_MS + 2 * F);
+    expect(done).toEqual([]);
+    expect(car.free).toBe(true);
+  });
+
   it('cannot be driven out of the shaft', () => {
     const car = new Car(CAR_REST);
     for (let i = 0; i < 200; i += 1) car.drive(1);

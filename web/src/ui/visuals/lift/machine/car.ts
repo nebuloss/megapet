@@ -104,6 +104,17 @@ export class Car implements Driven {
     else work();
   }
 
+  /**
+   * Drops whatever is still queued.
+   *
+   * A new run does not inherit the last one's orders. A test abandoned during
+   * a reversal leaves a shift waiting behind the landing, and without this it
+   * is thrown partway through the next run's opening move.
+   */
+  clear(): void {
+    this.orders.length = 0;
+  }
+
   /** Puts it somewhere at once, for reduced motion. */
   place(at: number): void {
     this.journey.snap(at);

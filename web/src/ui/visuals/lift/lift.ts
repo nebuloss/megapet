@@ -24,7 +24,7 @@ import {
   CAR_REST,
   DRIVE,
   DRIVEN,
-  HOME_MS,
+  DRIVE_RATIO,
   LAND_MS,
   rideMs,
   FORK,
@@ -38,7 +38,6 @@ import {
   RING_LENGTH,
   ROPE_PIN_BASE,
   ROPE_RUN_X,
-  SHEAVE,
   SHIFT_DRUM_R,
   SHIFT_MS,
   SPRING_ANCHOR,
@@ -47,9 +46,10 @@ import {
   STAGE,
   START_ANGLE,
   SWEEP,
-  WEIGHT,
+  SWEEP_RAD,
 } from './layout';
-import { carriageTop } from './carriage';
+import { Car } from './machine/car';
+import { hoist } from './machine/hoist';
 import { SvgScene } from './machine/scene';
 import { liftMarkup } from './markup';
 import { armTransform } from './nookie';
@@ -84,50 +84,37 @@ export class LiftVisual implements SpeedVisual {
   private readonly unitEl: HTMLElement;
   private readonly phaseEl: HTMLElement;
 
+  /**
+   * The car, and the shaft read off it.
+   *
+   * Its position is carried, never computed from the reading: a formula like
+   * `anchor + sign * fraction * travel` teleports it the moment the sign
+   * flips, because the eased reading has not caught up yet. The machine takes
+   * it over whenever it moves it itself — home before a run, up the shaft
+   * while the ping is taken, into a floor when a leg ends — and the belt has
+   * no say while it does.
+   */
+  private readonly car = new Car();
+  private readonly shaft = hoist(this.car, () => this.shownFraction);
+
   /** Eased reading, in Mbps. The needle and the gear pair follow it. */
   private shown = 0;
   private target = 0;
   private lastFraction = 0;
 
-  /**
-   * The car's position is carried, not computed from the reading. That is what
-   * makes reversing safe: the direction of travel can change without the car
-   * being asked to jump to wherever a new formula would put it.
-   */
   /** Needle position, 0..1. Eased here rather than in Mbps — see `toFraction`. */
   private shownFraction = 0;
   /** Where the needle is heading, 0..1. Converted when the target is set, so
    *  the frame loop stays free of transcendental maths. */
   private aimFraction = 0;
 
-  private carTop = CAR_REST;
   private driveSign = -1;
-
-  /**
-   * Progress of a move the machine is making itself, 0..1; 1 when idle.
-   *
-   * Resetting used to assign carTop and shown directly, which teleported the
-   * car and snapped the needle the moment Start was pressed on a second run.
-   * The machine drives it home instead, and integration is suspended while it
-   * does — the same reason the brake suspends it during a belt shift. Landing
-   * at the end of a phase uses the same mechanism with a different floor.
-   */
-  private glideT = 1;
-  private glideFrom = CAR_REST;
-  private glideTo = CAR_REST;
-  private glideMs = HOME_MS;
 
   /** A scripted sweep of the needle back to its stop, 0..1; 1 when idle. */
   private returnT = 1;
   private returnFrom = 0;
   private returnShown = 0;
   private returnMs = SWEEP_MS;
-
-  /** A direction change waiting for the car to stop before the gear is shifted. */
-  private pendingDrive: Drive | null = null;
-  /** A journey waiting for the machine to finish what it is already doing. */
-  private pendingRide: number | null = null;
-  private pendingRideMs = 0;
 
   private shiftT = 1;
   private cross = CROSS_FOR.up;
@@ -182,7 +169,8 @@ export class LiftVisual implements SpeedVisual {
     this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     if (this.reducedMotion.matches) {
       this.shown = this.target;
-      this.shownFraction = this.aimFraction;
+      this.turn(this.aimFraction - this.shownFraction);
+      this.shownFraction = this.lastFraction = this.aimFraction;
       this.paint();
       return;
     }
@@ -206,14 +194,10 @@ export class LiftVisual implements SpeedVisual {
       this.paint();
       return;
     }
-    // The reversing gear cannot be shifted while the car is still running.
-    // If it is finishing its run into a floor, the shift queues behind it.
-    if (this.glideT < 1) {
-      this.pendingDrive = direction;
-      this.startLoop();
-      return;
-    }
-    this.beginShift(direction);
+    // The reversing gear cannot be thrown while the car is still running. If it
+    // is finishing its run into a floor, the shift queues behind it.
+    this.car.order(() => this.beginShift(direction));
+    this.startLoop();
   }
 
   /**
@@ -221,13 +205,13 @@ export class LiftVisual implements SpeedVisual {
    * the way into whichever floor it was heading for and levels it there.
    */
   land(): void {
-    const floor = this.driveSign > 0 ? CAR_BOTTOM : CAR.top;
     if (this.reducedMotion.matches) {
-      this.carTop = floor;
+      this.car.place(this.driveSign > 0 ? CAR_BOTTOM : CAR.top);
       this.paint();
       return;
     }
-    this.startGlide(floor, LAND_MS);
+    this.car.land(this.driveSign);
+    this.startLoop();
   }
 
   /**
@@ -250,42 +234,23 @@ export class LiftVisual implements SpeedVisual {
    * doing rather than cutting it short. Returns how long it will take.
    */
   private ride(to: number): number {
-    const busy = this.glideT < 1;
-    const from = busy ? this.glideTo : this.carTop;
-    const ms = rideMs(Math.abs(to - from));
     if (this.reducedMotion.matches) {
-      this.carTop = to;
+      this.car.place(to);
       this.paint();
       return 0;
     }
-    if (busy) {
-      this.pendingRide = to;
-      this.pendingRideMs = ms;
-      this.startLoop();
-    } else {
-      this.startGlide(to, ms);
-    }
+    const ms = rideMs(Math.abs(to - this.car.destination));
+    this.car.order(() => this.car.rideTo(to));
+    this.startLoop();
     return ms;
   }
 
   settleMs(): number {
-    const home = this.glideT < 1 ? (1 - this.glideT) * this.glideMs : 0;
     const swing = this.returnT < 1 ? (1 - this.returnT) * this.returnMs : 0;
-    return Math.round(Math.max(home, swing));
-  }
-
-  /** Hands the car to the machine for a scripted move; the belt has no say. */
-  private startGlide(to: number, ms: number): void {
-    this.glideFrom = this.carTop;
-    this.glideTo = to;
-    this.glideMs = ms;
-    // Already there: skip it, or a zero-length move would hold up a shift.
-    this.glideT = Math.abs(to - this.carTop) < 0.5 ? 1 : 0;
-    this.startLoop();
+    return Math.round(Math.max(this.car.busyMs, swing));
   }
 
   private beginShift(direction: Drive): void {
-    this.pendingDrive = null;
     this.crossFrom = this.cross;
     this.crossTo = CROSS_FOR[direction];
     this.leverFrom = this.leverAngle;
@@ -312,13 +277,14 @@ export class LiftVisual implements SpeedVisual {
     this.root.dataset.drive = 'up';
     this.seat(CROSS_FOR.up, LEVER.seatUp);
     this.setProgress(0);
+    // Nothing queued from the last run survives into this one.
+    this.car.clear();
 
     if (this.reducedMotion.matches) {
       this.shown = 0;
       this.shownFraction = 0;
       this.lastFraction = 0;
-      this.carTop = CAR_REST;
-      this.glideT = 1;
+      this.car.place(CAR_REST);
     } else {
       // The hold has two jobs and must be long enough for both. It has to
       // outlast the needle's fall, because the needle turns the sheave through
@@ -327,14 +293,13 @@ export class LiftVisual implements SpeedVisual {
       // Start while the car was still parking after a slow upload sized this
       // from a 200ms fall and moved it 19.9 units in one frame, against a
       // budget of 6.4.
+      //
+      // A hold with nowhere to go is still a hold, so the fall cannot reach the
+      // car — but a first run has neither a fall to outlast nor a distance to
+      // cover, and must not be made to wait for one.
       const fall = this.shownFraction > 0 ? this.returnMs : 0;
-      const travel = rideMs(Math.abs(CAR_REST - this.carTop));
-      this.startGlide(CAR_REST, Math.max(fall, travel));
-      // Hold even with nowhere to go, so the fall cannot reach the car.
-      if (this.shownFraction > 0) this.glideT = 0;
+      if (fall > 0 || Math.abs(CAR_REST - this.car.position) >= 0.5) this.car.home(fall);
     }
-    this.pendingDrive = null;
-    this.pendingRide = null;
     this.shiftT = 1;
     this.root.dataset.shifting = 'false';
     this.startLoop();
@@ -397,6 +362,16 @@ export class LiftVisual implements SpeedVisual {
     this.aimFraction = next;
   }
 
+  /**
+   * Hands the needle's move to the rope, in radians of sheave.
+   *
+   * Offered every frame and either used or dropped, never accumulated: a delta
+   * saved up while the car is held arrives all at once the moment it is let go.
+   */
+  private turn(delta: number): void {
+    this.car.drive(this.driveSign * delta * DRIVE_RATIO * SWEEP_RAD);
+  }
+
   private startLoop(): void {
     if (this.dead || this.frame) return;
     this.lastFrameAt = 0;
@@ -423,33 +398,28 @@ export class LiftVisual implements SpeedVisual {
         const ratio = wanted === 0 ? 1 : allowed / wanted;
         this.shown += (approach(this.shown, this.target, dt, EASE_TAU) - this.shown) * ratio;
       }
+      const moved = this.shownFraction - this.lastFraction;
+      this.lastFraction = this.shownFraction;
+
       if (this.shiftT < 1) {
         this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);
         if (this.shiftT === 1) this.root.dataset.shifting = 'false';
       }
-      if (this.glideT < 1) {
-        this.glideT = Math.min(1, this.glideT + dt / this.glideMs);
-        if (this.glideT === 1) {
-          if (this.pendingRide !== null) {
-            const to = this.pendingRide;
-            this.pendingRide = null;
-            this.startGlide(to, this.pendingRideMs);
-          } else if (this.pendingDrive) {
-            this.beginShift(this.pendingDrive);
-          }
-        }
-      }
+      // The brake holds the sheave for the whole throw, so the needle's move
+      // reaches nothing; the car itself declines it while the machine has it.
+      if (this.shiftT >= 1) this.turn(moved);
+      this.car.update(dt);
 
       const settled =
         Math.abs(aim - before) < 0.0005 &&
         this.shiftT === 1 &&
-        this.glideT === 1 &&
         this.returnT === 1 &&
-        this.pendingRide === null &&
-        !this.pendingDrive;
+        this.car.free;
       if (settled) {
         this.shown = this.target;
+        this.turn(aim - this.shownFraction);
         this.shownFraction = aim;
+        this.lastFraction = aim;
       }
       this.paint();
 
@@ -512,7 +482,6 @@ export class LiftVisual implements SpeedVisual {
   private paint(): void {
     const fraction = this.shownFraction;
     const shift = this.shiftT;
-    const shifting = shift < 1;
 
     // --- the throw ---
     const crossProgress = easeInOut(stage(shift, STAGE.cross));
@@ -525,30 +494,11 @@ export class LiftVisual implements SpeedVisual {
       1,
     );
 
-    // --- the car: carried, homed before a run, held during a belt shift ---
-    this.carTop = carriageTop({
-      top: this.carTop,
-      fraction,
-      lastFraction: this.lastFraction,
-      driveSign: this.driveSign,
-      held: shifting,
-      glide: this.glideT,
-      glideFrom: this.glideFrom,
-      glideTo: this.glideTo,
-    });
-    this.lastFraction = fraction;
-    const carTop = this.carTop;
-
     // --- rotations ---
     const hubPhase = toRadians(START_ANGLE + fraction * SWEEP);
     const layPhase = -hubPhase * (HUB.teeth / LAY.teeth);
-    const sheavePhase = (CAR.top - carTop) / SHEAVE.radius;
     this.scene.transform('hub', `rotate(${toDegrees(hubPhase).toFixed(2)})`);
     this.scene.transform('lay', `rotate(${toDegrees(layPhase).toFixed(2)})`);
-    this.scene.transform(
-      'sheave',
-      `translate(${SHEAVE.x} ${SHEAVE.y}) rotate(${toDegrees(sheavePhase).toFixed(2)})`,
-    );
 
     // --- the belt, and the fork walking it across ---
     const slack = Math.sin(Math.PI * clamp(crossProgress, 0, 1));
@@ -576,21 +526,15 @@ export class LiftVisual implements SpeedVisual {
       `translate(${(Math.cos(pawlDir) * lift).toFixed(2)} ${(Math.sin(pawlDir) * lift).toFixed(2)})`,
     );
 
-    this.scene.path('rope', this.ropeShape(carTop, this.leverAngle, forkAngle));
+    this.scene.path('rope', this.ropeShape(this.car.position, this.leverAngle, forkAngle));
     const springPin = drumPin(FORK, SPRING_PIN_R, toRadians(SPRING_PIN_BASE), toRadians(forkAngle));
     this.scene.path('spring', springOutline(SPRING_ANCHOR, springPin));
 
-    // --- car, counterweight, dial ---
-    const weightTop = WEIGHT.low - (carTop - CAR.top);
-    this.scene.transform('car', `translate(0 ${carTop.toFixed(2)})`);
-    this.scene.transform('weight', `translate(0 ${weightTop.toFixed(2)})`);
-    this.scene.attr('carRope', 'y2', carTop.toFixed(2));
-    this.scene.attr('weightRope', 'y2', weightTop.toFixed(2));
+    // --- the shaft, and the dial ---
+    this.shaft.place(this.scene);
     this.scene.attr('valueArc', 'stroke-dashoffset', String(ARC_LENGTH * (1 - fraction)));
-
     this.scene.quantity('lift-effort', fraction.toFixed(3));
-    this.scene.quantity('nookie-bob', `${(2.6 - fraction * 1.8).toFixed(2)}s`);
-    this.scene.quantity('streak-duration', `${(1.5 - fraction * 1.15).toFixed(2)}s`);
+
     // The unit is chosen with the number, so a gigabit link reads 8.74 Gbps
     // rather than 8741, and a slow one keeps its digits.
     const reading = formatReadout(this.reading ?? this.shown, this.unit);

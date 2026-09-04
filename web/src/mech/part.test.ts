@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Assembly, Derived, RecordingScene, type Part } from './part';
+import { Assembly, Attribute, Derived, Flag, Quantity, RecordingScene, type Part } from './part';
 
 /** A stand-in machine: a fork whose throw everything else is derived from. */
 function machine(state: { throw_: number; car: number }) {
@@ -95,6 +95,37 @@ describe('a derived part', () => {
     m.place(a);
     m.place(b);
     expect(a.snapshot()).toBe(b.snapshot());
+  });
+});
+
+describe('the other things a part can say', () => {
+  it('sets an attribute, for a rope end or an arc offset', () => {
+    const state = { car: 206 };
+    const scene = new RecordingScene();
+    const rope = new Attribute('carRope', 'y2', () => state.car.toFixed(1));
+    rope.place(scene);
+    expect(scene.attrs.get('carRope.y2')).toBe('206.0');
+    state.car = 298;
+    rope.place(scene);
+    expect(scene.attrs.get('carRope.y2')).toBe('298.0');
+  });
+
+  it('raises a flag and reports a quantity, both derived like anything else', () => {
+    const state = { braked: false, effort: 0 };
+    const scene = new RecordingScene();
+    const machine = new Assembly(
+      'machine',
+      new Flag('braked', () => state.braked),
+      new Quantity('effort', () => state.effort.toFixed(2)),
+    );
+    machine.place(scene);
+    expect(scene.flags.get('braked')).toBe(false);
+    expect(scene.quantities.get('effort')).toBe('0.00');
+    state.braked = true;
+    state.effort = 0.75;
+    machine.place(scene);
+    expect(scene.flags.get('braked')).toBe(true);
+    expect(scene.quantities.get('effort')).toBe('0.75');
   });
 });
 
