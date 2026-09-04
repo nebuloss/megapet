@@ -54,7 +54,6 @@ import {
   STAGE,
 } from '../layout';
 import { Move } from '../../move';
-import { armTransform } from '../nookie';
 
 export class ReversingGear {
   private readonly stroke = new Move();
@@ -210,9 +209,6 @@ export function reversingParts(gear: ReversingGear, carTop: () => number): Assem
     new Derived('beltB', belt(1, -1), 'path'),
     new Derived('shifter', () => `rotate(${gear.forkAngle.toFixed(2)} ${FORK.x} ${FORK.y})`),
     new Derived('lever', () => `rotate(${gear.leverAngle.toFixed(2)} ${LEVER.x} ${LEVER.y})`),
-    // Below this the pose is not worth drawing, and an empty transform hands
-    // the arm back to the stylesheet's own waving animation.
-    new Derived('arm', () => (gear.grip > 0.002 ? armTransform(gear.leverAngle, gear.grip) : '')),
     new Derived(
       'brakeShoe',
       () =>
