@@ -1,3 +1,4 @@
+import { SWEEP_MIN_MS, SWEEP_MS } from './tempo';
 /**
  * The shared speed scale.
  *
@@ -25,9 +26,7 @@ export const EASE_TAU = 110;
  * by the link rather than by the design. The limit only bites on big jumps;
  * near the target the exponential is already slower than this.
  */
-export const SWEEP_MS = 1600;
 
-const SWEEP_MIN_MS = 200;
 
 /** How long the needle takes to cover `distance` of the dial, 0..1. */
 export function sweepMs(distance: number): number {
@@ -35,6 +34,8 @@ export function sweepMs(distance: number): number {
 }
 
 /** The bottom of the dial. Anything slower pins the needle against the stop. */
+export { SWEEP_MS } from './tempo';
+
 export const MIN_MBPS = 1;
 export const MAX_MBPS = 10_000;
 

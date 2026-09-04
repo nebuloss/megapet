@@ -17,6 +17,11 @@ import {
   type Pulley,
   type Rect,
 } from '../../../mech';
+import { RIDE_FULL_MS, RIDE_MIN_MS } from '../tempo';
+
+// The scene keeps the geometry; every duration lives in one place next door,
+// so slowing the machine down is one number rather than seven.
+export { HOME_MS, LAND_MS, RIDE_FULL_MS, SETTLE_MS, SHIFT_MS } from '../tempo';
 
 export const MODULE = 2.6;
 
@@ -127,7 +132,6 @@ export const NOOKIE = fitTransform(NOOKIE_BOUNDS, CAR_WINDOW, { padding: 1.5, ma
  * thing worth watching, and the brake is on throughout so the car cannot move
  * while the drive is neither one thing nor the other.
  */
-export const SHIFT_MS = 2600;
 /** Crossed belt drives the car up; open belt drives it down. */
 export const CROSS_FOR: Record<'up' | 'down', number> = { up: 1, down: 0 };
 
@@ -142,15 +146,12 @@ export const STAGE = {
 
 
 /** How long the machine takes to return the car to its floor before a run. */
-export const HOME_MS = 900;
 
 /**
  * A full-shaft journey at lift speed. Shorter trips take proportionally less,
  * so the car moves at one speed rather than always taking the same time —
  * which is what makes a long ride read as a ride rather than a jump.
  */
-export const RIDE_FULL_MS = 2400;
-const RIDE_MIN_MS = 300;
 
 /** How long the car takes to travel `distance`, at lift speed. */
 export function rideMs(distance: number): number {
@@ -165,4 +166,3 @@ export function rideMs(distance: number): number {
  * reads as an abandoned journey. When the phase ends the machine drives it the
  * rest of the way and levels it into the floor it was heading for.
  */
-export const LAND_MS = 700;

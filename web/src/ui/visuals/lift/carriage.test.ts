@@ -2,17 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { approach, limitStep } from '../../primitives/anim';
 import { EASE_TAU, SWEEP_MS, sweepMs, toFraction } from '../scale';
 import { carriageTop, type CarriageInput } from './carriage';
-import {
-  CAR,
-  CAR_BOTTOM,
-  CAR_REST,
-  HOME_MS,
-  LAND_MS,
-  RIDE_FULL_MS,
-  SHIFT_MS,
-  TRAVEL,
-  rideMs,
-} from './layout';
+import { CAR, CAR_BOTTOM, CAR_REST, TRAVEL, rideMs } from './layout';
+import { HOME_MS, LAND_MS, RIDE_FULL_MS, SHIFT_MS } from '../tempo';
 
 const FRAME_MS = 16;
 

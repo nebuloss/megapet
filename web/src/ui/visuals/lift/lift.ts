@@ -1,7 +1,7 @@
 import { clamp } from '../../../mech';
 import { icon, type IconName } from '../../primitives/icons';
 import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from '../visual';
-import { CAR, CAR_REST, LAND_MS, RING_LENGTH, SHIFT_MS } from './layout';
+import { CAR, CAR_REST, LAND_MS, RING_LENGTH, SETTLE_MS, SHIFT_MS } from './layout';
 import { LiftMachine } from './machine/machine';
 import { SvgScene } from './machine/scene';
 import { liftMarkup } from './markup';
@@ -31,7 +31,7 @@ export class LiftVisual implements SpeedVisual {
   readonly root: HTMLElement;
 
   /** Long enough for the car to land and the belt to be walked across. */
-  readonly transitionMs = LAND_MS + SHIFT_MS + 250;
+  readonly transitionMs = LAND_MS + SHIFT_MS + SETTLE_MS;
 
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   private readonly machine = new LiftMachine(() => this.reducedMotion.matches);
