@@ -137,20 +137,6 @@ export const STAGE = {
   unbrake: [0.86, 1.0],
 } as const;
 
-export const EASE_TAU = 110;
-
-/**
- * How long the needle takes to swing back to its stop between phases.
- *
- * Zeroing the reading is a scripted sweep, not a reading being tracked. At the
- * reading's own time constant a full-scale drop is 36 degrees in the first
- * frame and over in three, which reads as a reset rather than a needle.
- *
- * It has to fit inside the window where the car is under the machine's
- * control — a landing then the brake, 3300ms — because the needle drives the
- * car through the belt and would otherwise drag it back up the shaft.
- */
-export const RETURN_MS = 1600;
 
 /** How long the machine takes to return the car to its floor before a run. */
 export const HOME_MS = 900;

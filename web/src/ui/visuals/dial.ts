@@ -1,5 +1,6 @@
+import { approach, limitStep } from '../primitives/anim';
 import { icon, type IconName } from '../primitives/icons';
-import { TICKS, toFraction } from './scale';
+import { EASE_TAU, SWEEP_MS, TICKS, toFraction } from './scale';
 import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
 
 const CENTER = 100;
@@ -58,6 +59,7 @@ export class DialVisual implements SpeedVisual {
   private aimFraction = 0;
   private target = 0;
   private frame = 0;
+  private lastFrameAt = 0;
   private unit = 'Mbps';
   private reading: number | null = null;
 
@@ -205,24 +207,31 @@ export class DialVisual implements SpeedVisual {
 
   private startAnimation(): void {
     if (this.frame) return;
-    const step = (): void => {
-      // Exponential ease: quick to catch a big jump, calm near the target.
+    this.lastFrameAt = 0;
+    const step = (now: number): void => {
+      // Driven by elapsed time, not by frames. Stepping a fixed fraction per
+      // frame ran this arc at double speed on a 120Hz display and quadruple
+      // on a 240Hz one, while a phone dropping frames crawled.
+      const dt = this.lastFrameAt ? Math.min(64, now - this.lastFrameAt) : 16;
+      this.lastFrameAt = now;
+
       // The arc follows the eased fraction, not the eased Mbps: the scale is
       // logarithmic, so easing the value would sweep the arc in one frame.
       const aim = this.aimFraction;
-      const delta = aim - this.shownFraction;
-      if (Math.abs(delta) < 0.001) {
+      if (Math.abs(aim - this.shownFraction) < 0.001) {
         this.shown = this.target;
         this.shownFraction = aim;
         this.paint();
         this.frame = 0;
         return;
       }
-      // Chasing a live reading wants to be quick; falling back to the stop
-      // between phases wants to look like a needle, not a reset.
-      const rate = aim === 0 ? 0.045 : 0.22;
-      this.shown += (this.target - this.shown) * rate;
-      this.shownFraction += delta * rate;
+      // Same speed limit as the lift's needle, for the same reason: without
+      // one, how fast the arc sweeps is decided by how fast the link is.
+      const wanted = approach(this.shownFraction, aim, dt, EASE_TAU) - this.shownFraction;
+      const allowed = limitStep(wanted, dt, SWEEP_MS);
+      this.shownFraction += allowed;
+      const ratio = wanted === 0 ? 1 : allowed / wanted;
+      this.shown += (approach(this.shown, this.target, dt, EASE_TAU) - this.shown) * ratio;
       this.paint();
       this.frame = requestAnimationFrame(step);
     };

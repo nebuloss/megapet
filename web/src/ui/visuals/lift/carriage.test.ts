@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { approach } from '../../primitives/anim';
-import { toFraction } from '../scale';
+import { approach, limitStep } from '../../primitives/anim';
+import { EASE_TAU, SWEEP_MS, sweepMs, toFraction } from '../scale';
 import { carriageTop, type CarriageInput } from './carriage';
 import {
   CAR,
   CAR_BOTTOM,
   CAR_REST,
-  EASE_TAU,
   HOME_MS,
   LAND_MS,
-  RETURN_MS,
   RIDE_FULL_MS,
   SHIFT_MS,
   TRAVEL,
@@ -19,12 +17,17 @@ import {
 const FRAME_MS = 16;
 
 /**
- * The needle eases with a time constant, so in one frame it can close at most
- * `1 - e^(-dt/tau)` of the gap to its target — about 13.5% of full scale. The
- * car is geared straight to it, so that is also the most it may move. Anything
- * beyond this is a teleport, which is the bug this file exists to catch.
+ * The most the car may move in one frame under any circumstances.
+ *
+ * The fastest legitimate move is a full-shaft landing: `easeInOut` peaks at
+ * three times its average rate, so that is the ceiling everything else has to
+ * fit under. Anything beyond it is a teleport, which is the bug this file
+ * exists to catch.
  */
-const MAX_STEP = (1 - Math.exp(-FRAME_MS / EASE_TAU)) * TRAVEL;
+const MAX_STEP = 3.05 * (TRAVEL / LAND_MS) * FRAME_MS;
+
+/** What the needle alone may drive the car through in a frame, at its limit. */
+const NEEDLE_STEP = (FRAME_MS / SWEEP_MS) * TRAVEL;
 
 /**
  * How close to a floor counts as landed.
@@ -71,7 +74,9 @@ function machine(): Machine {
 
 /** One frame of the same sequence `LiftVisual` runs: ease, advance, place. */
 function frame(m: Machine, target: number): number {
-  m.shown = approach(m.shown, toFraction(target), FRAME_MS, EASE_TAU);
+  // Eased for shape, then capped for speed, exactly as the visuals do.
+  const wanted = approach(m.shown, toFraction(target), FRAME_MS, EASE_TAU) - m.shown;
+  m.shown += limitStep(wanted, FRAME_MS, SWEEP_MS);
   if (m.shiftT < 1) m.shiftT = Math.min(1, m.shiftT + FRAME_MS / SHIFT_MS);
   if (m.glideT < 1) {
     m.glideT = Math.min(1, m.glideT + FRAME_MS / m.glideMs);
@@ -157,7 +162,7 @@ function reset(m: Machine): void {
   m.pendingShift = null;
   m.pendingRide = null;
   m.shiftT = 1;
-  glide(m, CAR_REST, RETURN_MS);
+  glide(m, CAR_REST, sweepMs(m.shown));
   m.glideT = 0;
 }
 
@@ -166,7 +171,7 @@ function run(m: Machine, downloadMbps: number, uploadMbps: number): number {
   let worst = 0;
   reset(m);
   const opening = ride(m, CAR.top); // queued behind the settle
-  worst = Math.max(worst, hold(m, 0, RETURN_MS + opening + 200));
+  worst = Math.max(worst, hold(m, 0, SWEEP_MS + opening + 200));
   reverse(m, 'down');
   worst = Math.max(worst, hold(m, 0, LAND_MS + SHIFT_MS + 250));
   worst = Math.max(worst, hold(m, downloadMbps, 8000));
@@ -193,13 +198,24 @@ describe('carriageTop', () => {
 
   it('is called all the way up while the ping is taken', () => {
     const m = machine();
+    // A second run: the previous one left the needle near full scale, so
+    // there is a real fall to wait for before the car may be called up.
+    m.shown = toFraction(9500);
+    m.lastFraction = m.shown;
+    const settle = sweepMs(m.shown);
     reset(m);
     const opening = ride(m, CAR.top);
-    hold(m, 0, RETURN_MS - FRAME_MS);
+    hold(m, 0, settle - 2 * FRAME_MS);
     // Still at the bottom: the ride waits for the needle to finish falling.
     expect(Math.abs(m.top - CAR_REST)).toBeLessThan(ON_THE_FLOOR);
-    hold(m, 0, opening + 2 * FRAME_MS);
+    hold(m, 0, opening + 3 * FRAME_MS);
     expect(Math.abs(m.top - CAR.top)).toBeLessThan(ON_THE_FLOOR);
+  });
+
+  it('waits for nothing on a first run, when the needle is already down', () => {
+    const m = machine();
+    reset(m);
+    expect(sweepMs(m.shown)).toBeLessThan(sweepMs(1));
   });
 
   it('rides at one speed, so a longer trip takes longer', () => {
@@ -289,8 +305,33 @@ describe('carriageTop', () => {
     // The needle turns the sheave through the belt, so a return sweep that
     // outlasts the machine's hold on the car would drag it up the shaft.
     // Between phases the hold is the landing plus the whole belt shift; at a
-    // reset it is the homing glide, which is started with RETURN_MS by name.
-    expect(LAND_MS + SHIFT_MS).toBeGreaterThanOrEqual(RETURN_MS);
+    // reset it is the homing glide, sized from the same sweep.
+    expect(LAND_MS + SHIFT_MS).toBeGreaterThanOrEqual(SWEEP_MS);
+  });
+
+  it('drives the car at one speed whatever the link is doing', () => {
+    // Without a speed limit the needle's rate is proportional to the distance
+    // left, so a ten-gigabit reading moved the car across the shaft in a third
+    // of a second while a slow link ambled — the same animation at whatever
+    // speed the link happened to dictate.
+    const fast = machine();
+    const slow = machine();
+    for (const m of [fast, slow]) {
+      m.glideT = 1;
+      m.top = CAR.top;
+      m.driveSign = 1;
+    }
+    let fastWorst = 0;
+    let slowWorst = 0;
+    for (let t = 0; t < 4000; t += FRAME_MS) {
+      fastWorst = Math.max(fastWorst, frame(fast, 9500));
+      slowWorst = Math.max(slowWorst, frame(slow, 60));
+    }
+    expect(fastWorst).toBeLessThanOrEqual(NEEDLE_STEP + 1e-9);
+    expect(slowWorst).toBeLessThanOrEqual(NEEDLE_STEP + 1e-9);
+    // Both reach the limit, so they travel at the same speed and simply stop
+    // at different floors — which is the whole point.
+    expect(fastWorst).toBeCloseTo(slowWorst, 9);
   });
 
   it('stays within the shaft', () => {

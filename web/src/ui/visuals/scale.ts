@@ -12,6 +12,28 @@
  * the needle across 53% of the dial, and drags anything geared to it along.
  */
 
+/** How fast the needle chases a reading: the time constant of its easing. */
+export const EASE_TAU = 110;
+
+/**
+ * The needle's speed limit: how long it takes to cross the whole dial.
+ *
+ * An exponential ease alone has no speed, only a time constant, so how fast
+ * the needle moves depends on how far it has to go. A ten-gigabit reading
+ * slams it across the dial in a third of a second while a slow link ambles
+ * across a corner of it — the same animation at two different speeds, decided
+ * by the link rather than by the design. The limit only bites on big jumps;
+ * near the target the exponential is already slower than this.
+ */
+export const SWEEP_MS = 1600;
+
+const SWEEP_MIN_MS = 200;
+
+/** How long the needle takes to cover `distance` of the dial, 0..1. */
+export function sweepMs(distance: number): number {
+  return Math.max(SWEEP_MIN_MS, Math.round(Math.abs(distance) * SWEEP_MS));
+}
+
 /** The bottom of the dial. Anything slower pins the needle against the stop. */
 export const MIN_MBPS = 1;
 export const MAX_MBPS = 10_000;

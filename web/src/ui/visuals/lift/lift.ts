@@ -12,9 +12,9 @@ import {
   toRadians,
   wrapTau,
 } from '../../../mech';
-import { approach, easeInOut, easeOutBack, stage } from '../../primitives/anim';
+import { approach, easeInOut, easeOutBack, limitStep, stage } from '../../primitives/anim';
 import { icon, type IconName } from '../../primitives/icons';
-import { toFraction } from '../scale';
+import { EASE_TAU, SWEEP_MS, sweepMs, toFraction } from '../scale';
 import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from '../visual';
 import {
   ARC_LENGTH,
@@ -24,10 +24,8 @@ import {
   CAR_REST,
   DRIVE,
   DRIVEN,
-  EASE_TAU,
   HOME_MS,
   LAND_MS,
-  RETURN_MS,
   rideMs,
   FORK,
   HUB,
@@ -140,6 +138,7 @@ export class LiftVisual implements SpeedVisual {
   private returnT = 1;
   private returnFrom = 0;
   private returnShown = 0;
+  private returnMs = SWEEP_MS;
 
   /** A direction change waiting for the car to stop before the gear is shifted. */
   private pendingDrive: Drive | null = null;
@@ -309,7 +308,7 @@ export class LiftVisual implements SpeedVisual {
 
   settleMs(): number {
     const home = this.glideT < 1 ? (1 - this.glideT) * this.glideMs : 0;
-    const swing = this.returnT < 1 ? (1 - this.returnT) * RETURN_MS : 0;
+    const swing = this.returnT < 1 ? (1 - this.returnT) * this.returnMs : 0;
     return Math.round(Math.max(home, swing));
   }
 
@@ -363,7 +362,7 @@ export class LiftVisual implements SpeedVisual {
         // The needle's fall to the stop turns the sheave through the belt, so
         // the machine holds the car for exactly as long as the fall lasts —
         // even when the car is already home and has nowhere to go.
-        this.startGlide(CAR_REST, RETURN_MS);
+        this.startGlide(CAR_REST, this.returnMs);
         this.glideT = 0;
       } else {
         this.startGlide(CAR_REST, HOME_MS);
@@ -418,6 +417,9 @@ export class LiftVisual implements SpeedVisual {
       // re-sends zero ten times a second and must not restart the sweep.
       this.returnFrom = this.shownFraction;
       this.returnShown = this.shown;
+      // At one speed, so a needle near the stop drops back quickly and one at
+      // full scale takes the whole sweep.
+      this.returnMs = sweepMs(this.shownFraction);
       this.returnT = 0;
     } else if (next > 0) {
       this.returnT = 1;
@@ -437,13 +439,19 @@ export class LiftVisual implements SpeedVisual {
       if (this.returnT < 1) {
         // Swinging back to the stop: a fixed sweep, with the readout falling on
         // the same curve so the number and the needle stay together.
-        this.returnT = Math.min(1, this.returnT + dt / RETURN_MS);
+        this.returnT = Math.min(1, this.returnT + dt / this.returnMs);
         const swing = easeInOut(this.returnT);
         this.shownFraction = lerp(this.returnFrom, 0, swing);
         this.shown = lerp(this.returnShown, 0, swing);
       } else {
-        this.shown = approach(this.shown, this.target, dt, EASE_TAU);
-        this.shownFraction = approach(this.shownFraction, aim, dt, EASE_TAU);
+        // The exponential decides the shape, the limit decides the speed.
+        const wanted = approach(this.shownFraction, aim, dt, EASE_TAU) - this.shownFraction;
+        const allowed = limitStep(wanted, dt, SWEEP_MS);
+        this.shownFraction += allowed;
+        // The readout is held back by the same proportion, so the number and
+        // the needle never disagree about where the reading has got to.
+        const ratio = wanted === 0 ? 1 : allowed / wanted;
+        this.shown += (approach(this.shown, this.target, dt, EASE_TAU) - this.shown) * ratio;
       }
       if (this.shiftT < 1) {
         this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);

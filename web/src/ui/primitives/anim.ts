@@ -19,6 +19,18 @@ export function easeOutBack(t: number, overshoot = 1.4): number {
 }
 
 /**
+ * Caps how far a value may travel in one frame.
+ *
+ * Turns "arrive in a fixed time" into "move at a fixed speed": a longer
+ * journey takes proportionally longer rather than being covered faster.
+ * `fullMs` is how long the whole range, 0 to 1, is allowed to take.
+ */
+export function limitStep(step: number, dt: number, fullMs: number): number {
+  const most = dt / fullMs;
+  return clamp(step, -most, most);
+}
+
+/**
  * Frame-rate independent exponential approach. `tau` is the time constant in
  * milliseconds: the motion looks the same at 60 Hz and 144 Hz.
  */
