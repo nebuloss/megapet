@@ -69,3 +69,17 @@ export function toFraction(mbps: number): number {
   if (Number.isNaN(mbps) || mbps <= MIN_MBPS) return 0;
   return Math.min(1, (Math.log10(mbps) - LOG_MIN) / LOG_SPAN);
 }
+
+/**
+ * The scale read backwards: what reading sits at this position on the dial.
+ *
+ * So a readout can be derived from where the pointer is rather than eased
+ * alongside it. Two values easing separately towards the same reading do not
+ * agree on the way — the number ran most of the way up while the pointer was
+ * still leaving the stop — and the only way to be sure they agree is for there
+ * to be one of them.
+ */
+export function fromFraction(position: number): number {
+  if (position <= 0) return 0;
+  return 10 ** (position * LOG_SPAN + LOG_MIN);
+}
