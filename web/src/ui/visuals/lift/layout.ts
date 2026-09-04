@@ -128,6 +128,9 @@ export const NOOKIE = fitTransform(NOOKIE_BOUNDS, CAR_WINDOW, { padding: 1.5, ma
  * while the drive is neither one thing nor the other.
  */
 export const SHIFT_MS = 2600;
+/** Crossed belt drives the car up; open belt drives it down. */
+export const CROSS_FOR: Record<'up' | 'down', number> = { up: 1, down: 0 };
+
 export const STAGE = {
   brake: [0.0, 0.12],
   reach: [0.14, 0.28],
