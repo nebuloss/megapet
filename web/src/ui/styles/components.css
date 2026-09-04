@@ -730,12 +730,14 @@
 /* The mascot's fur stays beige across both themes; only the scarf follows the
    Material You seed, so Nookies stays recognisably Nookies. */
 .lift {
-  --nookie-fur: #d9c3a3;
-  --nookie-fur-dark: #a98761;
-  --nookie-fur-soft: #edd9c0;
-  --nookie-muzzle: #f4e7d7;
+  /* Sampled from the real Noukie's bear: a greyed taupe, not a golden teddy.
+     The old beige was too yellow, which read as a generic bear rather than
+     this one. */
+  --nookie-fur: #c9b298;
+  --nookie-fur-dark: #a08a70;
+  --nookie-fur-soft: #ddcdb6;
+  --nookie-muzzle: #ece0cc;
   --nookie-ink: #4a382a;
-  --nookie-blush: #e8a598;
   --lift-accent: var(--md-sys-color-primary);
   --lift-effort: 0;
   --nookie-bob: 2.6s;
@@ -1131,6 +1133,8 @@
 
 .nookie__muzzle {
   fill: var(--nookie-muzzle);
+  stroke: color-mix(in srgb, var(--nookie-fur-dark) 55%, transparent);
+  stroke-width: 0.7;
 }
 
 .nookie__nose {
@@ -1149,11 +1153,6 @@
   transform-box: fill-box;
   transform-origin: center;
   animation: nookie-blink 5.5s ease-in-out infinite;
-}
-
-.nookie__blush {
-  fill: var(--nookie-blush);
-  opacity: 0.5;
 }
 
 .nookie__scarf,
