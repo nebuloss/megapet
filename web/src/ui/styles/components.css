@@ -1168,9 +1168,20 @@
   stroke-linecap: round;
 }
 
+/* The far arm is the same arm, in shadow — not a different colour. It used to
+   take the outline tone at 55%, which on this background reads as another
+   material rather than as the same fur behind the body. */
 .nookie__arm--back path {
-  stroke: var(--nookie-fur-dark);
-  opacity: 0.55;
+  stroke: color-mix(in srgb, var(--nookie-fur) 84%, var(--nookie-fur-dark));
+}
+
+/* Pads: the one cue that reads as a paw rather than a sleeve at this size. */
+.nookie__paw {
+  fill: var(--nookie-fur-soft);
+}
+
+.nookie__arm--back .nookie__paw {
+  fill: color-mix(in srgb, var(--nookie-fur-soft) 84%, var(--nookie-fur-dark));
 }
 
 /* The wave is the one gesture that speeds up with the connection. */

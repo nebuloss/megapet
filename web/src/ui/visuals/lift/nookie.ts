@@ -17,7 +17,10 @@ const MAX_STRETCH = 1.25;
 export function nookieMarkup(): string {
   return `
   <g class="nookie">
-    <g class="nookie__arm nookie__arm--back"><path d="M11 4 q10 -1 12 -9"/></g>
+    <g class="nookie__arm nookie__arm--back">
+      <path d="M11 4 q10 -1 12 -9"/>
+      <circle class="nookie__paw" cx="23" cy="-5" r="2"/>
+    </g>
     <ellipse class="nookie__ear" cx="-12" cy="-20" rx="6.6" ry="6.6"/>
     <ellipse class="nookie__ear" cx="12" cy="-20" rx="6.6" ry="6.6"/>
     <ellipse class="nookie__ear-inner" cx="-12" cy="-20" rx="3" ry="3"/>
@@ -36,7 +39,10 @@ export function nookieMarkup(): string {
     </g>
     <ellipse class="nookie__blush" cx="-10" cy="-7" rx="3" ry="2"/>
     <ellipse class="nookie__blush" cx="10" cy="-7" rx="3" ry="2"/>
-    <g class="nookie__arm nookie__arm--wave"><path d="M-11 4 q-10 -1 -12 -9"/></g>
+    <g class="nookie__arm nookie__arm--wave">
+      <path d="M-11 4 q-10 -1 -12 -9"/>
+      <circle class="nookie__paw" cx="-23" cy="-5" r="2"/>
+    </g>
   </g>`;
 }
 
