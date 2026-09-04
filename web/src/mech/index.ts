@@ -3,6 +3,7 @@
  * rope, spring and detent bookkeeping that shifts them, plus the SVG path
  * generation for all of it. Nothing in here knows about the speedtest.
  */
+export * from './drive';
 export * from './geometry';
 export * from './gear';
 export * from './rope';

@@ -53,6 +53,15 @@ them back here before syncing again or the change is lost.
   `transitionMs` for a reversal. Do not shorten a hold below the move it
   covers; the needle drives the car through the belt, so anything the machine
   is doing has to outlast whatever the needle is doing.
+- `web/src/mech/drive.ts` — the drive train, and the one part of the library
+  that is objects rather than functions, because these are the parts that carry
+  state. A part drives the part it drives: `hub -> pair -> lay -> belt -> brake
+  -> sheave -> car`. Two rules make it work. **Motion is passed as increments,
+  never positions** — a train that sets absolute positions throws the car the
+  length of the shaft the moment a ratio changes sign. **A part may decline** —
+  a set brake refuses, a held carriage ignores its rope — which is how the
+  model says the machine, not the mechanism, is in charge right now, and why a
+  delta is always offered once and either used or dropped.
 - The car's position is **carried state**, never computed from the reading. A
   formula like `anchor + sign * fraction * travel` teleports the car the moment
   `sign` flips, because the eased reading has not caught up yet. The rule lives
