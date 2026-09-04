@@ -1,4 +1,14 @@
-import { clamp, lerp, toDegrees, toRadians } from '../../../mech';
+import {
+  BeltDrive,
+  Brake,
+  GearPair,
+  Rotation,
+  clamp,
+  lerp,
+  toDegrees,
+  toRadians,
+  type Driven,
+} from '../../../mech';
 import { approach, easeInOut, limitStep } from '../../primitives/anim';
 import { icon, type IconName } from '../../primitives/icons';
 import { EASE_TAU, SWEEP_MS, sweepMs, toFraction } from '../scale';
@@ -8,7 +18,8 @@ import {
   CAR,
   CAR_BOTTOM,
   CAR_REST,
-  DRIVE_RATIO,
+  DRIVE,
+  DRIVEN,
   LAND_MS,
   rideMs,
   HUB,
@@ -16,7 +27,6 @@ import {
   RING_LENGTH,
   SHIFT_MS,
   START_ANGLE,
-  SWEEP,
   SWEEP_RAD,
 } from './layout';
 import { Car } from './machine/car';
@@ -76,6 +86,21 @@ export class LiftVisual implements SpeedVisual {
   private readonly gear = new ReversingGear();
   private readonly linkage = reversingParts(this.gear, () => this.car.position);
 
+  /**
+   * The drive train, from the needle's shaft to the rope over the sheave.
+   *
+   * The needle turns the hub; the hub is permanently meshed with the
+   * layshaft; the layshaft carries the belt to the sheave; the sheave's brake
+   * sits between them; and the car hangs off the rope. Motion is passed along
+   * it as increments, never as positions, which is what makes reversing safe:
+   * whatever the ratio, a small input is a small output, so the belt can
+   * change sign without the car being thrown the length of the shaft.
+   */
+  private readonly hub: Rotation;
+  private readonly lay: Rotation;
+  private readonly belt: BeltDrive;
+  private readonly brake: Brake;
+
   /** Eased reading, in Mbps. The needle and the gear pair follow it. */
   private shown = 0;
   private target = 0;
@@ -104,6 +129,21 @@ export class LiftVisual implements SpeedVisual {
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   constructor() {
+    // Assembled from the far end back, because each part is given the part it
+    // drives. The rope takes the sheave's turn the other way round: the car
+    // hangs on the side that rises when the reading does.
+    const rope: Driven = { drive: (delta) => this.car.drive(-delta) };
+    this.brake = new Brake(rope);
+    this.belt = new BeltDrive(DRIVE.radius, DRIVEN.radius, this.brake);
+    this.lay = new Rotation(this.belt);
+    const pair = new GearPair(HUB, LAY, this.lay);
+    this.hub = new Rotation(pair);
+    // Seated rather than driven, so the needle starts against its stop with
+    // the layshaft already where that mesh puts it.
+    this.hub.seat(toRadians(START_ANGLE));
+    this.lay.seat(toRadians(START_ANGLE) * pair.ratio);
+    this.belt.setCrossed(true);
+
     this.root = document.createElement('figure');
     this.root.className = 'lift';
     this.root.dataset.drive = 'up';
@@ -161,12 +201,19 @@ export class LiftVisual implements SpeedVisual {
 
     if (this.reducedMotion.matches) {
       this.gear.seat(direction);
+      this.belt.setCrossed(direction === 'up');
       this.paint();
       return;
     }
     // The reversing gear cannot be thrown while the car is still running. If it
     // is finishing its run into a floor, the shift queues behind it.
-    this.car.order(() => this.gear.begin(direction));
+    this.car.order(() => {
+      this.gear.begin(direction);
+      // Latched now rather than read from how crossed the belt looks: mid-throw
+      // it is neither open nor crossed and the question has no answer. Nothing
+      // beyond the brake is moving anyway.
+      this.belt.setCrossed(direction === 'up');
+    });
     this.startLoop();
   }
 
@@ -229,14 +276,17 @@ export class LiftVisual implements SpeedVisual {
     this.driveSign = -1;
     this.root.dataset.drive = 'up';
     this.gear.seat('up');
+    this.belt.setCrossed(true);
     this.setProgress(0);
     // Nothing queued from the last run survives into this one.
     this.car.clear();
 
     if (this.reducedMotion.matches) {
       this.shown = 0;
-      this.shownFraction = 0;
-      this.lastFraction = 0;
+      // Wound back through the train rather than assigned, so the needle and
+      // the gears it turns cannot end up disagreeing about where the stop is.
+      this.turn(-this.shownFraction);
+      this.shownFraction = this.lastFraction = 0;
       this.car.place(CAR_REST);
     } else {
       // The hold has two jobs and must be long enough for both. It has to
@@ -314,13 +364,16 @@ export class LiftVisual implements SpeedVisual {
   }
 
   /**
-   * Hands the needle's move to the rope, in radians of sheave.
+   * Hands the needle's move to the train.
    *
    * Offered every frame and either used or dropped, never accumulated: a delta
-   * saved up while the car is held arrives all at once the moment it is let go.
+   * saved up while the car is held arrives all at once the moment it is let
+   * go. The brake is set first, so the needle still turns the gears and the
+   * belt during a throw while nothing beyond them moves.
    */
   private turn(delta: number): void {
-    this.car.drive(this.driveSign * delta * DRIVE_RATIO * SWEEP_RAD);
+    this.brake.set = this.gear.holding;
+    this.hub.drive(delta * SWEEP_RAD);
   }
 
   private startLoop(): void {
@@ -353,9 +406,7 @@ export class LiftVisual implements SpeedVisual {
       this.lastFraction = this.shownFraction;
 
       this.gear.update(dt);
-      // The brake holds the sheave for the whole throw, so the needle's move
-      // reaches nothing; the car declines it too while the machine has it.
-      if (!this.gear.holding) this.turn(moved);
+      this.turn(moved);
       this.car.update(dt);
 
       const settled =
@@ -383,10 +434,8 @@ export class LiftVisual implements SpeedVisual {
     const fraction = this.shownFraction;
 
     // --- the gear pair the needle turns, permanently in mesh ---
-    const hubPhase = toRadians(START_ANGLE + fraction * SWEEP);
-    const layPhase = -hubPhase * (HUB.teeth / LAY.teeth);
-    this.scene.transform('hub', `rotate(${toDegrees(hubPhase).toFixed(2)})`);
-    this.scene.transform('lay', `rotate(${toDegrees(layPhase).toFixed(2)})`);
+    this.scene.transform('hub', `rotate(${toDegrees(this.hub.phase).toFixed(2)})`);
+    this.scene.transform('lay', `rotate(${toDegrees(this.lay.phase).toFixed(2)})`);
 
     this.linkage.place(this.scene);
     this.shaft.place(this.scene);
