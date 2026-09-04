@@ -59,6 +59,7 @@ export class DialVisual implements SpeedVisual {
   private aimFraction = 0;
   private target = 0;
   private frame = 0;
+  private dead = false;
   private lastFrameAt = 0;
   private unit = 'Mbps';
   private reading: number | null = null;
@@ -195,6 +196,8 @@ export class DialVisual implements SpeedVisual {
   }
 
   destroy(): void {
+    // Terminal — see LiftVisual.destroy.
+    this.dead = true;
     if (this.frame) cancelAnimationFrame(this.frame);
     this.frame = 0;
   }
@@ -206,7 +209,7 @@ export class DialVisual implements SpeedVisual {
   }
 
   private startAnimation(): void {
-    if (this.frame) return;
+    if (this.dead || this.frame) return;
     this.lastFrameAt = 0;
     const step = (now: number): void => {
       // Driven by elapsed time, not by frames. Stepping a fixed fraction per

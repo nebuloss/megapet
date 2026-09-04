@@ -162,8 +162,11 @@ function reset(m: Machine): void {
   m.pendingShift = null;
   m.pendingRide = null;
   m.shiftT = 1;
-  glide(m, CAR_REST, sweepMs(m.shown));
-  m.glideT = 0;
+  // Long enough for the needle's fall AND for the distance home — see the
+  // comment in reset(). Sizing it from the fall alone throws the car.
+  const fall = m.shown > 0 ? sweepMs(m.shown) : 0;
+  glide(m, CAR_REST, Math.max(fall, rideMs(Math.abs(CAR_REST - m.top))));
+  if (m.shown > 0) m.glideT = 0;
 }
 
 /** The whole run: settle, called up during the ping, down, up, home again. */
@@ -233,6 +236,27 @@ describe('carriageTop', () => {
     m.shown = toFraction(940);
     m.lastFraction = toFraction(940);
     expect(run(m, 620, 450)).toBeLessThanOrEqual(MAX_STEP);
+  });
+
+  it('does not throw the car home when Start is pressed during the park', () => {
+    // The park rides the car home over 2400ms. Pressing Start partway through
+    // leaves it far from the ground floor with the needle wherever the upload
+    // left it — and on a slow link that needle is near the stop, so a hold
+    // sized from its fall alone was only 200ms for most of a shaft: 19.9 units
+    // in one frame. Every reading has to be safe, not just the fast ones.
+    for (const mbps of [1.5, 12, 120, 940, 8741]) {
+      const m = machine();
+      m.top = CAR.top; // as far from home as the car can be
+      m.shown = toFraction(mbps);
+      m.lastFraction = m.shown;
+      reset(m);
+      let worst = 0;
+      for (let t = 0; t < RIDE_FULL_MS + 400; t += FRAME_MS) {
+        worst = Math.max(worst, frame(m, 0));
+      }
+      expect(worst).toBeLessThanOrEqual(MAX_STEP);
+      expect(Math.abs(m.top - CAR_REST)).toBeLessThan(ON_THE_FLOOR);
+    }
   });
 
   it('runs a download into the bottom floor, not wherever the reading stopped', () => {

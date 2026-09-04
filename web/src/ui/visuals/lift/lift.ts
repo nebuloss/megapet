@@ -157,6 +157,7 @@ export class LiftVisual implements SpeedVisual {
   private reading: number | null = null;
   private unit = 'Mbps';
   private frame = 0;
+  private dead = false;
   private lastFrameAt = 0;
 
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -358,15 +359,18 @@ export class LiftVisual implements SpeedVisual {
       this.carTop = CAR_REST;
       this.glideT = 1;
     } else {
-      if (this.shownFraction > 0) {
-        // The needle's fall to the stop turns the sheave through the belt, so
-        // the machine holds the car for exactly as long as the fall lasts —
-        // even when the car is already home and has nowhere to go.
-        this.startGlide(CAR_REST, this.returnMs);
-        this.glideT = 0;
-      } else {
-        this.startGlide(CAR_REST, HOME_MS);
-      }
+      // The hold has two jobs and must be long enough for both. It has to
+      // outlast the needle's fall, because the needle turns the sheave through
+      // the belt and would otherwise drag the car back up the shaft. And it has
+      // to be long enough for the distance, or the car is thrown home: pressing
+      // Start while the car was still parking after a slow upload sized this
+      // from a 200ms fall and moved it 19.9 units in one frame, against a
+      // budget of 6.4.
+      const fall = this.shownFraction > 0 ? this.returnMs : 0;
+      const travel = rideMs(Math.abs(CAR_REST - this.carTop));
+      this.startGlide(CAR_REST, Math.max(fall, travel));
+      // Hold even with nowhere to go, so the fall cannot reach the car.
+      if (this.shownFraction > 0) this.glideT = 0;
     }
     this.pendingDrive = null;
     this.pendingRide = null;
@@ -402,6 +406,10 @@ export class LiftVisual implements SpeedVisual {
   }
 
   destroy(): void {
+    // Terminal. `frame` alone cannot mean this, because startLoop's guard is
+    // `if (this.frame) return` — so any later setPosition would restart the
+    // loop on a detached tree and animate it forever.
+    this.dead = true;
     if (this.frame) cancelAnimationFrame(this.frame);
     this.frame = 0;
   }
@@ -428,7 +436,7 @@ export class LiftVisual implements SpeedVisual {
   }
 
   private startLoop(): void {
-    if (this.frame) return;
+    if (this.dead || this.frame) return;
     this.lastFrameAt = 0;
     const step = (now: number): void => {
       const dt = this.lastFrameAt ? Math.min(64, now - this.lastFrameAt) : 16;
