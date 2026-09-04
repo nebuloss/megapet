@@ -42,9 +42,13 @@ them back here before syncing again or the change is lost.
   the belt is what reverses the lift. Do not reintroduce a gear that swings in
   and out of mesh: at this scale an idler bridging two gears is wider than the
   gap it would have to leave through, so it gets drawn straight through its
-  neighbours. `layout.ts` is the scene, `markup.ts` the SVG, `lift.ts` the
-  state and the shift's stages. `web/src/ui/visuals/dial.ts` is the alternative
-  plain dial. Both satisfy `SpeedVisual`.
+  neighbours. `layout.ts` is the scene and `markup.ts` the SVG; everything that
+  moves is in `machine/`, where `machine.ts` composes the pointer, the drive
+  train, the reversing gear, the hoist and the passenger, and owns the frame
+  order; `scene.ts` is the only object that knows what an element is. `lift.ts`
+  is left with the document and the frame loop. `web/src/ui/visuals/dial.ts` is
+  the alternative plain dial; both satisfy `SpeedVisual`, and both point with
+  the same `visuals/pointer.ts`.
 - The run has a shape, and the phases are paced to fit it: the car rests at the
   ground floor, is called up the shaft while the ping is taken, carries the
   download down, the upload up, and comes home when the results are in. The
@@ -56,7 +60,8 @@ them back here before syncing again or the change is lost.
 - `web/src/mech/drive.ts` — the drive train, and the one part of the library
   that is objects rather than functions, because these are the parts that carry
   state. A part drives the part it drives: `hub -> pair -> lay -> belt -> brake
-  -> sheave -> car`. Two rules make it work. **Motion is passed as increments,
+  -> rope -> car`, and the sheave is read back off the car, because what it has
+  turned by is how much rope has passed over it. Two rules make it work. **Motion is passed as increments,
   never positions** — a train that sets absolute positions throws the car the
   length of the shaft the moment a ratio changes sign. **A part may decline** —
   a set brake refuses, a held carriage ignores its rope — which is how the
@@ -65,12 +70,13 @@ them back here before syncing again or the change is lost.
 - The car's position is **carried state**, never computed from the reading. A
   formula like `anchor + sign * fraction * travel` teleports the car the moment
   `sign` flips, because the eased reading has not caught up yet. The rule lives
-  in `web/src/ui/visuals/lift/carriage.ts` as a pure function, and
-  `carriage.test.ts` simulates whole runs and fails if any single frame moves
-  the car further than the needle's easing allows. The machine takes the car
-  over whenever it moves it itself — home before a run, called up the shaft,
-  into a floor when a leg ends, back to the ground floor after — and the belt
-  has no say while it does. A reversal queues behind the landing, so
+  in `Travel` and in `lift/machine/car.ts`, and `machine/machine.test.ts` runs
+  whole runs through the real machine and fails if any single frame moves the
+  car further than the needle's easing allows. `carriage.ts` still holds the
+  same rule as a pure function, with `carriage.test.ts` over it. The machine
+  takes the car over whenever it moves it itself — home before a run, called up
+  the shaft, into a floor when a leg ends, back to the ground floor after — and
+  the belt has no say while it does. A reversal queues behind the landing, so
   `transitionMs` covers `LAND_MS + SHIFT_MS`.
 - The dial scale is **logarithmic**, so animate the fraction, never the Mbps.
   Easing the value and converting per frame swept the needle across half the
