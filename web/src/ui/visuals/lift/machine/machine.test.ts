@@ -213,22 +213,31 @@ describe('the lift machine', () => {
     expect(drawn(painted).snapshot()).toBe(drawn(plain).snapshot());
   });
 
-  it('still gives a complete, correct scene when it may not move', () => {
-    const machine = new LiftMachine(() => true);
+  it('travels rather than landing at once, whatever the motion preference', () => {
+    // The machine used to be handed a "reduce motion" predicate and, when it
+    // was set, put every part where it was going in a single frame. That made
+    // the car cross the whole shaft instantly, which is worse for motion
+    // sensitivity than the same distance travelled calmly, not better. The
+    // car's travel is the content — it is how the picture says which phase is
+    // running and which way the data goes — and what is genuinely decorative
+    // is suppressed by the stylesheet under the same media query.
+    const machine = new LiftMachine();
     machine.reset();
-    expect(machine.settleMs()).toBe(0);
-    expect(machine.ride(CAR.top)).toBe(0);
-    expect(carTop(machine)).toBeCloseTo(CAR.top, 1);
+    expect(machine.ride(CAR.top)).toBe(RIDE_FULL_MS);
+    expect(carTop(machine)).toBeCloseTo(CAR_REST, 1); // it has not arrived yet
 
-    machine.aim(940);
-    machine.reverse('down');
-    machine.land();
-    expect(carTop(machine)).toBeCloseTo(CAR_BOTTOM, 1);
-    expect(machine.reading).toBeCloseTo(940, 6);
+    let worst = 0;
+    let previous = carTop(machine);
+    for (let t = 0; t < RIDE_FULL_MS + 200; t += 16) {
+      machine.update(16);
+      worst = Math.max(worst, Math.abs(carTop(machine) - previous));
+      previous = carTop(machine);
+    }
+    expect(carTop(machine)).toBeCloseTo(CAR.top, 1);
+    // A journey, not a jump: no frame covers more than a fiftieth of the shaft.
+    expect(worst).toBeLessThan(TRAVEL / 50);
 
     const scene = drawn(machine);
-    expect(scene.flags.get('shifting')).toBe(false);
-    expect(scene.flags.get('braked')).toBe(false);
     expect(scene.snapshot()).not.toContain('NaN');
   });
 });

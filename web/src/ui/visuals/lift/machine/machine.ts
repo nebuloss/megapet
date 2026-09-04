@@ -27,8 +27,6 @@ import { Pointer } from '../../pointer';
 import { sweepMs } from '../../scale';
 import type { Drive } from '../../visual';
 import {
-  CAR,
-  CAR_BOTTOM,
   CAR_REST,
   DRIVE,
   DRIVEN,
@@ -47,6 +45,21 @@ import { ReversingGear, reversingParts } from './reversing';
 /** Closer than this and a journey is not worth making. */
 const ARRIVED = 0.5;
 
+/**
+ * Note on `prefers-reduced-motion`: this machine does not consult it, and that
+ * is deliberate.
+ *
+ * It used to, and every journey landed at once instead of being made — which
+ * meant the car crossed the whole shaft in a single frame. A large instant
+ * change of position is worse for motion sensitivity than the same distance
+ * travelled calmly, not better, so honouring the preference that way made the
+ * visual less accessible rather than more.
+ *
+ * The car's travel is the content here: it is how the picture says which
+ * phase is running and which way the data is going. What is decorative — the
+ * bear's idle bob, its wave, the blinking, the speed streaks — is suppressed
+ * by the stylesheet under the same media query, which is where that belongs.
+ */
 export class LiftMachine {
   private readonly pointer = new Pointer();
   private readonly car = new Car();
@@ -62,12 +75,8 @@ export class LiftMachine {
   /** Which way the car travels as the reading rises. */
   private drive: Drive = 'up';
 
-  /**
-   * @param still Whether every move should land at once instead of being
-   * played. Reduced motion, asked each time rather than fixed at assembly, so
-   * the setting can be changed while the page is open.
-   */
-  constructor(private readonly still: () => boolean = () => false) {
+  /** Assembles the machine, seated and at rest on the ground floor. */
+  constructor() {
     // Assembled from the far end back, because each part is given the part it
     // drives: pointer -> hub -> mesh -> layshaft -> belt -> brake -> rope ->
     // car. The rope takes the sheave's turn the other way round, because the
@@ -117,7 +126,6 @@ export class LiftMachine {
   /** Sends the pointer to a reading. */
   aim(mbps: number): void {
     this.pointer.aim(mbps);
-    if (this.still()) this.settle();
   }
 
   /**
@@ -129,11 +137,6 @@ export class LiftMachine {
    */
   reverse(direction: Drive): void {
     this.drive = direction;
-    if (this.still()) {
-      this.gear.seat(direction);
-      this.belt.setCrossed(direction === 'up');
-      return;
-    }
     this.car.order(() => {
       this.gear.begin(direction);
       // Latched as the throw begins rather than read from how crossed the belt
@@ -151,19 +154,11 @@ export class LiftMachine {
    * quarters of the way down and leaves it there.
    */
   land(): void {
-    if (this.still()) {
-      this.car.place(this.drive === 'down' ? CAR_BOTTOM : CAR.top);
-      return;
-    }
     this.car.land(this.drive === 'down' ? 1 : -1);
   }
 
   /** A journey at lift speed, queued behind whatever is under way. */
   ride(to: number): number {
-    if (this.still()) {
-      this.car.place(to);
-      return 0;
-    }
     const ms = rideMs(Math.abs(to - this.car.destination));
     this.car.order(() => this.car.rideTo(to));
     return ms;
@@ -179,11 +174,6 @@ export class LiftMachine {
     // abandoned during a reversal leaves a shift waiting behind the landing.
     this.car.clear();
 
-    if (this.still()) {
-      this.settle();
-      this.car.place(CAR_REST);
-      return;
-    }
     // The hold has two jobs and must be long enough for both. It has to outlast
     // the pointer's fall, because the pointer turns the sheave through the belt
     // and would otherwise drag the car back up the shaft. And it has to be long

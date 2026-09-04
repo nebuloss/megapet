@@ -33,8 +33,7 @@ export class LiftVisual implements SpeedVisual {
   /** Long enough for the car to land and the belt to be walked across. */
   readonly transitionMs = LAND_MS + SHIFT_MS + SETTLE_MS;
 
-  private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  private readonly machine = new LiftMachine(() => this.reducedMotion.matches);
+  private readonly machine = new LiftMachine();
   private readonly scene: SvgScene;
 
   private readonly numberEl: HTMLElement;
@@ -178,8 +177,7 @@ export class LiftVisual implements SpeedVisual {
 
   /** Plays what the machine was just told to do, or shows it done. */
   private run(): void {
-    if (this.reducedMotion.matches) this.render();
-    else this.startLoop();
+    this.startLoop();
   }
 
   private startLoop(): void {
