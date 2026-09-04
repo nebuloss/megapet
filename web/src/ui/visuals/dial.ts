@@ -1,6 +1,6 @@
-import { approach, limitStep } from '../primitives/anim';
 import { icon, type IconName } from '../primitives/icons';
-import { EASE_TAU, SWEEP_MS, TICKS, toFraction } from './scale';
+import { Pointer } from './pointer';
+import { TICKS, toFraction } from './scale';
 import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from './visual';
 
 const CENTER = 100;
@@ -51,13 +51,16 @@ export class DialVisual implements SpeedVisual {
   private readonly unitEl: HTMLElement;
   private readonly phaseEl: HTMLElement;
 
-  private shown = 0;
-  /** Needle position, 0..1. Eased here rather than in Mbps — see `toFraction`. */
-  private shownFraction = 0;
-  /** Where the arc is heading, 0..1. Converted when the target is set, so the
-   *  frame loop stays free of transcendental maths. */
-  private aimFraction = 0;
-  private target = 0;
+  /**
+   * The same pointer the lift has, with nothing geared to it.
+   *
+   * A dial is an instrument with no drive train and no hoist attached, so it
+   * shares the part that carries the reading and skips the parts that carry it
+   * anywhere. Everything it used to hold — the eased reading, the scale
+   * position, the target, the conversion between them, the speed limit — lives
+   * there now, once.
+   */
+  private readonly pointer = new Pointer();
   private frame = 0;
   private dead = false;
   private lastFrameAt = 0;
@@ -141,7 +144,7 @@ export class DialVisual implements SpeedVisual {
   park(): void {}
 
   setPosition(mbps: number): void {
-    this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
+    this.pointer.aim(mbps);
     this.startAnimation();
   }
 
@@ -163,11 +166,13 @@ export class DialVisual implements SpeedVisual {
     // Back to the resting colour. The upload leaves the machine on the
     // tertiary accent, and nothing else puts it back.
     this.setAccent('primary');
-    this.aim(0);
-    this.shown = 0;
-    this.shownFraction = 0;
+    // Swings back to the stop rather than snapping. The lift was fixed for
+    // this and the dial was not: dropping a full-scale reading to zero in one
+    // frame reads as a reset, not as an instrument.
+    this.pointer.aim(0);
     this.reading = null;
     this.setProgress(0);
+    this.startAnimation();
     this.paint();
   }
 
@@ -203,11 +208,6 @@ export class DialVisual implements SpeedVisual {
   }
 
   /** Sets the target and its scale position together; they must never drift. */
-  private aim(mbps: number): void {
-    this.target = mbps;
-    this.aimFraction = toFraction(mbps);
-  }
-
   private startAnimation(): void {
     if (this.dead || this.frame) return;
     this.lastFrameAt = 0;
@@ -218,24 +218,14 @@ export class DialVisual implements SpeedVisual {
       const dt = this.lastFrameAt ? Math.min(64, now - this.lastFrameAt) : 16;
       this.lastFrameAt = now;
 
-      // The arc follows the eased fraction, not the eased Mbps: the scale is
-      // logarithmic, so easing the value would sweep the arc in one frame.
-      const aim = this.aimFraction;
-      if (Math.abs(aim - this.shownFraction) < 0.001) {
-        this.shown = this.target;
-        this.shownFraction = aim;
+      this.pointer.update(dt);
+      this.paint();
+      if (this.pointer.settled) {
+        this.pointer.settle();
         this.paint();
         this.frame = 0;
         return;
       }
-      // Same speed limit as the lift's needle, for the same reason: without
-      // one, how fast the arc sweeps is decided by how fast the link is.
-      const wanted = approach(this.shownFraction, aim, dt, EASE_TAU) - this.shownFraction;
-      const allowed = limitStep(wanted, dt, SWEEP_MS);
-      this.shownFraction += allowed;
-      const ratio = wanted === 0 ? 1 : allowed / wanted;
-      this.shown += (approach(this.shown, this.target, dt, EASE_TAU) - this.shown) * ratio;
-      this.paint();
       this.frame = requestAnimationFrame(step);
     };
     this.frame = requestAnimationFrame(step);
@@ -244,12 +234,12 @@ export class DialVisual implements SpeedVisual {
   private paint(): void {
     // The unit is chosen with the number, so a gigabit link reads 8.74 Gbps
     // rather than 8741, and a slow one keeps its digits.
-    const reading = formatReadout(this.reading ?? this.shown, this.unit);
+    const reading = formatReadout(this.reading ?? this.pointer.reading, this.unit);
     this.numberEl.textContent = reading.value;
     if (this.unitEl.textContent !== reading.unit) this.unitEl.textContent = reading.unit;
     this.valueArc.setAttribute(
       'stroke-dashoffset',
-      String(ARC_LENGTH * (1 - this.shownFraction)),
+      String(ARC_LENGTH * (1 - this.pointer.position)),
     );
   }
 }
