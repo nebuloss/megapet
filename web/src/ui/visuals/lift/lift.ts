@@ -50,6 +50,7 @@ import {
   WEIGHT,
 } from './layout';
 import { carriageTop } from './carriage';
+import { SvgScene } from './machine/scene';
 import { liftMarkup } from './markup';
 import { armTransform } from './nookie';
 const ACCENTS: Record<GaugeAccent, string> = {
@@ -77,26 +78,8 @@ export class LiftVisual implements SpeedVisual {
   readonly transitionMs = LAND_MS + SHIFT_MS + 250;
 
   private readonly svg: SVGSVGElement;
-  private readonly nodes: {
-    car: SVGGElement;
-    weight: SVGGElement;
-    carRope: SVGLineElement;
-    weightRope: SVGLineElement;
-    beltA: SVGPathElement;
-    beltB: SVGPathElement;
-    shifter: SVGGElement;
-    brakeShoe: SVGGElement;
-    lever: SVGGElement;
-    rope: SVGPathElement;
-    spring: SVGPathElement;
-    pawl: SVGGElement;
-    hub: SVGGElement;
-    lay: SVGGElement;
-    sheave: SVGGElement;
-    valueArc: SVGPathElement;
-    ringArc: SVGPathElement;
-    waveArm: SVGGElement;
-  };
+  /** Where the machine's positions go. The only object that knows the DOM. */
+  private readonly scene: SvgScene;
   private readonly numberEl: HTMLElement;
   private readonly unitEl: HTMLElement;
   private readonly phaseEl: HTMLElement;
@@ -173,29 +156,7 @@ export class LiftVisual implements SpeedVisual {
     host.innerHTML = liftMarkup(`lift-shaft-${++instanceCount}`);
     this.root.append(host);
     this.svg = host.querySelector('svg')!;
-
-    const find = <T extends SVGElement>(selector: string): T =>
-      this.svg.querySelector<T>(selector)!;
-    this.nodes = {
-      car: find('.lift__car'),
-      weight: find('.lift__weight'),
-      carRope: find('.lift__cable--car'),
-      weightRope: find('.lift__cable--weight'),
-      beltA: find('.lift__belt--a'),
-      beltB: find('.lift__belt--b'),
-      shifter: find('.lift__shifter'),
-      brakeShoe: find('.lift__brake-shoe-group'),
-      lever: find('.lift__lever'),
-      rope: find('.lift__rope'),
-      spring: find('.lift__spring'),
-      pawl: find('.lift__pawl'),
-      hub: find('.lift__gear--hub .lift__gear-spin'),
-      lay: find('.lift__gear--lay .lift__gear-spin'),
-      sheave: find('.lift__sheave-spin'),
-      valueArc: find('.lift__dial-value'),
-      ringArc: find('.lift__progress-ring'),
-      waveArm: find('.nookie__arm--wave'),
-    };
+    this.scene = new SvgScene(this.root, this.svg);
 
     this.numberEl = document.createElement('div');
     this.numberEl.className = 'gauge__number tnum';
@@ -221,7 +182,7 @@ export class LiftVisual implements SpeedVisual {
     this.aim(Number.isFinite(mbps) && mbps > 0 ? mbps : 0);
     if (this.reducedMotion.matches) {
       this.shown = this.target;
-    this.shownFraction = this.aimFraction;
+      this.shownFraction = this.aimFraction;
       this.paint();
       return;
     }
@@ -381,7 +342,8 @@ export class LiftVisual implements SpeedVisual {
   }
 
   setProgress(fraction: number): void {
-    this.nodes.ringArc.setAttribute(
+    this.scene.attr(
+      'ringArc',
       'stroke-dashoffset',
       String(RING_LENGTH * (1 - clamp(fraction, 0, 1))),
     );
@@ -501,7 +463,11 @@ export class LiftVisual implements SpeedVisual {
   }
 
   /** One strand of the belt, bowed by however slack it is mid-shift. */
-  private strandShape(from: { x: number; y: number }, to: { x: number; y: number }, slack: number): string {
+  private strandShape(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    slack: number,
+  ): string {
     const midX = (from.x + to.x) / 2;
     const midY = (from.y + to.y) / 2;
     const dx = to.x - from.x;
@@ -528,7 +494,8 @@ export class LiftVisual implements SpeedVisual {
     const leaves = polar(
       PULLEY,
       PULLEY.r,
-      bearing(PULLEY, tangent) - Math.acos(PULLEY.r / Math.hypot(tangent.x - PULLEY.x, tangent.y - PULLEY.y)),
+      bearing(PULLEY, tangent) -
+        Math.acos(PULLEY.r / Math.hypot(tangent.x - PULLEY.x, tangent.y - PULLEY.y)),
     );
     return (
       `M ${pin.x.toFixed(2)} ${pin.y.toFixed(2)}` +
@@ -551,8 +518,7 @@ export class LiftVisual implements SpeedVisual {
     const crossProgress = easeInOut(stage(shift, STAGE.cross));
     this.cross = lerp(this.crossFrom, this.crossTo, crossProgress);
     this.leverAngle = lerp(this.leverFrom, this.leverTo, easeOutBack(stage(shift, STAGE.lever)));
-    const grip =
-      easeInOut(stage(shift, STAGE.reach)) * (1 - easeInOut(stage(shift, STAGE.release)));
+    const grip = easeInOut(stage(shift, STAGE.reach)) * (1 - easeInOut(stage(shift, STAGE.release)));
     const braked = clamp(
       easeInOut(stage(shift, STAGE.brake)) - easeInOut(stage(shift, STAGE.unbrake)),
       0,
@@ -577,56 +543,54 @@ export class LiftVisual implements SpeedVisual {
     const hubPhase = toRadians(START_ANGLE + fraction * SWEEP);
     const layPhase = -hubPhase * (HUB.teeth / LAY.teeth);
     const sheavePhase = (CAR.top - carTop) / SHEAVE.radius;
-    this.nodes.hub.setAttribute('transform', `rotate(${toDegrees(hubPhase).toFixed(2)})`);
-    this.nodes.lay.setAttribute('transform', `rotate(${toDegrees(layPhase).toFixed(2)})`);
-    this.nodes.sheave.setAttribute('transform',
-      `translate(${SHEAVE.x} ${SHEAVE.y}) rotate(${toDegrees(sheavePhase).toFixed(2)})`);
+    this.scene.transform('hub', `rotate(${toDegrees(hubPhase).toFixed(2)})`);
+    this.scene.transform('lay', `rotate(${toDegrees(layPhase).toFixed(2)})`);
+    this.scene.transform(
+      'sheave',
+      `translate(${SHEAVE.x} ${SHEAVE.y}) rotate(${toDegrees(sheavePhase).toFixed(2)})`,
+    );
 
     // --- the belt, and the fork walking it across ---
     const slack = Math.sin(Math.PI * clamp(crossProgress, 0, 1));
     const [a, b] = strands(DRIVE, DRIVEN, this.cross);
-    this.nodes.beltA.setAttribute('d', this.strandShape(a.from, a.to, slack));
-    this.nodes.beltB.setAttribute('d', this.strandShape(b.from, b.to, -slack));
+    this.scene.path('beltA', this.strandShape(a.from, a.to, slack));
+    this.scene.path('beltB', this.strandShape(b.from, b.to, -slack));
 
     const forkAngle = FORK.open + this.cross * (FORK.crossed - FORK.open);
-    this.nodes.shifter.setAttribute('transform', `rotate(${forkAngle.toFixed(2)} ${FORK.x} ${FORK.y})`);
-    this.nodes.lever.setAttribute(
-      'transform',
-      `rotate(${this.leverAngle.toFixed(2)} ${LEVER.x} ${LEVER.y})`,
-    );
-    this.nodes.waveArm.style.transform =
-      grip > 0.002 ? armTransform(this.leverAngle, grip) : '';
+    this.scene.transform('shifter', `rotate(${forkAngle.toFixed(2)} ${FORK.x} ${FORK.y})`);
+    this.scene.transform('lever', `rotate(${this.leverAngle.toFixed(2)} ${LEVER.x} ${LEVER.y})`);
+    this.scene.transform('arm', grip > 0.002 ? armTransform(this.leverAngle, grip) : '');
 
     // --- brake, detent, rope, spring ---
     const brakeDir = toRadians(BRAKE.angle);
-    this.nodes.brakeShoe.setAttribute(
-      'transform',
+    this.scene.transform(
+      'brakeShoe',
       `translate(${(-Math.cos(brakeDir) * BRAKE.lift * braked).toFixed(2)} ${(-Math.sin(brakeDir) * BRAKE.lift * braked).toFixed(2)})`,
     );
-    this.root.dataset.braked = braked > 0.5 ? 'true' : 'false';
+    this.scene.flag('braked', braked > 0.5);
 
     const lift = detentLift(forkAngle, [FORK.open, FORK.crossed], PAWL_LIFT, PAWL_WIDTH);
     const pawlDir = toRadians(PAWL_ANGLE);
-    this.nodes.pawl.setAttribute(
-      'transform',
+    this.scene.transform(
+      'pawl',
       `translate(${(Math.cos(pawlDir) * lift).toFixed(2)} ${(Math.sin(pawlDir) * lift).toFixed(2)})`,
     );
 
-    this.nodes.rope.setAttribute('d', this.ropeShape(carTop, this.leverAngle, forkAngle));
+    this.scene.path('rope', this.ropeShape(carTop, this.leverAngle, forkAngle));
     const springPin = drumPin(FORK, SPRING_PIN_R, toRadians(SPRING_PIN_BASE), toRadians(forkAngle));
-    this.nodes.spring.setAttribute('d', springOutline(SPRING_ANCHOR, springPin));
+    this.scene.path('spring', springOutline(SPRING_ANCHOR, springPin));
 
     // --- car, counterweight, dial ---
     const weightTop = WEIGHT.low - (carTop - CAR.top);
-    this.nodes.car.setAttribute('transform', `translate(0 ${carTop.toFixed(2)})`);
-    this.nodes.weight.setAttribute('transform', `translate(0 ${weightTop.toFixed(2)})`);
-    this.nodes.carRope.setAttribute('y2', carTop.toFixed(2));
-    this.nodes.weightRope.setAttribute('y2', weightTop.toFixed(2));
-    this.nodes.valueArc.setAttribute('stroke-dashoffset', String(ARC_LENGTH * (1 - fraction)));
+    this.scene.transform('car', `translate(0 ${carTop.toFixed(2)})`);
+    this.scene.transform('weight', `translate(0 ${weightTop.toFixed(2)})`);
+    this.scene.attr('carRope', 'y2', carTop.toFixed(2));
+    this.scene.attr('weightRope', 'y2', weightTop.toFixed(2));
+    this.scene.attr('valueArc', 'stroke-dashoffset', String(ARC_LENGTH * (1 - fraction)));
 
-    this.root.style.setProperty('--lift-effort', fraction.toFixed(3));
-    this.root.style.setProperty('--nookie-bob', `${(2.6 - fraction * 1.8).toFixed(2)}s`);
-    this.root.style.setProperty('--streak-duration', `${(1.5 - fraction * 1.15).toFixed(2)}s`);
+    this.scene.quantity('lift-effort', fraction.toFixed(3));
+    this.scene.quantity('nookie-bob', `${(2.6 - fraction * 1.8).toFixed(2)}s`);
+    this.scene.quantity('streak-duration', `${(1.5 - fraction * 1.15).toFixed(2)}s`);
     // The unit is chosen with the number, so a gigabit link reads 8.74 Gbps
     // rather than 8741, and a slow one keeps its digits.
     const reading = formatReadout(this.reading ?? this.shown, this.unit);
