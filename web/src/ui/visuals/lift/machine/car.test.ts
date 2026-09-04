@@ -39,6 +39,36 @@ describe('the car', () => {
     expect(up.position).toBeCloseTo(CAR.top, 6);
   });
 
+  it('does not overtake a journey already heading for that floor', () => {
+    // The reversal into the download lands the car while it is still being
+    // called up the shaft, and both are heading for the top. Landing it there
+    // again redid whatever was left of the ride in LAND_MS: from the ground
+    // floor that is most of the shaft in a second, which reads as a jump.
+    const car = new Car(CAR_REST);
+    const ride = car.rideTo(CAR.top);
+    expect(ride).toBe(RIDE_FULL_MS);
+    run(car, 400);
+    const left = car.busyMs;
+    expect(car.land(-1)).toBeCloseTo(left, 6); // the ride's own remaining time
+    let worst = 0;
+    let previous = car.position;
+    for (let t = 0; t < left + 200; t += F) {
+      car.update(F);
+      worst = Math.max(worst, Math.abs(car.position - previous));
+      previous = car.position;
+    }
+    // The ride's own pace, not a landing's.
+    expect(worst).toBeLessThan(2.5);
+    expect(Math.abs(car.position - CAR.top)).toBeLessThan(0.01);
+  });
+
+  it('still lands a leg the rope was actually carrying', () => {
+    const car = new Car(250);
+    expect(car.land(1)).toBe(LAND_MS);
+    run(car, LAND_MS + F);
+    expect(car.position).toBeCloseTo(CAR_BOTTOM, 6);
+  });
+
   it('rides at one speed, so a longer journey takes longer', () => {
     const far = new Car(CAR.top);
     const near = new Car(CAR_REST - TRAVEL / 4);

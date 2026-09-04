@@ -71,7 +71,17 @@ export class Car implements Driven {
    * the car three quarters of the way down and leaves it there.
    */
   land(driveSign: number): number {
-    return this.take(driveSign > 0 ? CAR_BOTTOM : CAR.top, LAND_MS);
+    const floor = driveSign > 0 ? CAR_BOTTOM : CAR.top;
+    // A landing finishes a leg the rope was carrying. If the machine is
+    // already taking the car to that floor, there is no unfinished leg —
+    // overtaking its journey to redo whatever is left in LAND_MS rushes it.
+    // That is what made the opening ride look like a jump to the top: the
+    // reversal into the download lands a car that is still being called up,
+    // and the remaining three quarters of the shaft got a single second.
+    if (this.journey.running && Math.abs(this.journey.destination - floor) < ARRIVED) {
+      return this.journey.remainingMs;
+    }
+    return this.take(floor, LAND_MS);
   }
 
   /** A journey at lift speed, so a longer trip takes proportionally longer. */
