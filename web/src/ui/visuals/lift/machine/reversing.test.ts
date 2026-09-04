@@ -82,6 +82,22 @@ describe('the reversing gear', () => {
     expect(gear.grip).toBeCloseTo(0, 3);
   });
 
+  it('lets the belt go slack on its way across and takes it up again', () => {
+    // Cut from the crossing's progress, not from how crossed the belt is: a
+    // throw begun partway through another one still goes fully slack.
+    const gear = new ReversingGear();
+    gear.seat('up');
+    expect(gear.slack).toBeCloseTo(0, 9);
+    gear.begin('down');
+    let peak = 0;
+    for (let t = 0; t < SHIFT_MS; t += F) {
+      gear.update(F);
+      peak = Math.max(peak, gear.slack);
+    }
+    expect(peak).toBeCloseTo(1, 2);
+    expect(gear.slack).toBeCloseTo(0, 3);
+  });
+
   it('swings the fork between its two seats and nowhere else', () => {
     const gear = new ReversingGear();
     gear.seat('up');

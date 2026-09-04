@@ -1,66 +1,35 @@
-import {
-  bearing,
-  clamp,
-  detentLift,
-  drumPin,
-  lerp,
-  polar,
-  springOutline,
-  strands,
-  tangentPoint,
-  toDegrees,
-  toRadians,
-  wrapTau,
-} from '../../../mech';
-import { approach, easeInOut, easeOutBack, limitStep, stage } from '../../primitives/anim';
+import { clamp, lerp, toDegrees, toRadians } from '../../../mech';
+import { approach, easeInOut, limitStep } from '../../primitives/anim';
 import { icon, type IconName } from '../../primitives/icons';
 import { EASE_TAU, SWEEP_MS, sweepMs, toFraction } from '../scale';
 import { formatReadout, type Drive, type GaugeAccent, type SpeedVisual } from '../visual';
 import {
   ARC_LENGTH,
-  BRAKE,
   CAR,
   CAR_BOTTOM,
   CAR_REST,
-  DRIVE,
-  DRIVEN,
   DRIVE_RATIO,
   LAND_MS,
   rideMs,
-  FORK,
   HUB,
   LAY,
-  LEVER,
-  PAWL_ANGLE,
-  PAWL_LIFT,
-  PAWL_WIDTH,
-  PULLEY,
   RING_LENGTH,
-  ROPE_PIN_BASE,
-  ROPE_RUN_X,
-  SHIFT_DRUM_R,
   SHIFT_MS,
-  SPRING_ANCHOR,
-  SPRING_PIN_BASE,
-  SPRING_PIN_R,
-  STAGE,
   START_ANGLE,
   SWEEP,
   SWEEP_RAD,
 } from './layout';
 import { Car } from './machine/car';
 import { hoist } from './machine/hoist';
+import { ReversingGear, reversingParts } from './machine/reversing';
 import { SvgScene } from './machine/scene';
 import { liftMarkup } from './markup';
-import { armTransform } from './nookie';
+
 const ACCENTS: Record<GaugeAccent, string> = {
   primary: 'var(--md-sys-color-primary)',
   secondary: 'var(--md-sys-color-secondary)',
   tertiary: 'var(--md-sys-color-tertiary)',
 };
-
-/** Crossed belt drives the car up; open belt drives it down. */
-const CROSS_FOR: Record<Drive, number> = { up: 1, down: 0 };
 
 let instanceCount = 0;
 
@@ -97,6 +66,16 @@ export class LiftVisual implements SpeedVisual {
   private readonly car = new Car();
   private readonly shaft = hoist(this.car, () => this.shownFraction);
 
+  /**
+   * The reversing gear, and everything it moves.
+   *
+   * One number moves: how far through its throw the fork is. The belt's
+   * crossing, the lever, the bear's grip on it, the brake and the detent are
+   * all read off that at different stages, so they cannot drift apart.
+   */
+  private readonly gear = new ReversingGear();
+  private readonly linkage = reversingParts(this.gear, () => this.car.position);
+
   /** Eased reading, in Mbps. The needle and the gear pair follow it. */
   private shown = 0;
   private target = 0;
@@ -116,14 +95,6 @@ export class LiftVisual implements SpeedVisual {
   private returnShown = 0;
   private returnMs = SWEEP_MS;
 
-  private shiftT = 1;
-  private cross = CROSS_FOR.up;
-  private crossFrom = CROSS_FOR.up;
-  private crossTo = CROSS_FOR.up;
-  private leverAngle = LEVER.seatUp;
-  private leverFrom = LEVER.seatUp;
-  private leverTo = LEVER.seatUp;
-
   private reading: number | null = null;
   private unit = 'Mbps';
   private frame = 0;
@@ -136,7 +107,6 @@ export class LiftVisual implements SpeedVisual {
     this.root = document.createElement('figure');
     this.root.className = 'lift';
     this.root.dataset.drive = 'up';
-    this.root.dataset.shifting = 'false';
 
     const host = document.createElement('div');
     host.className = 'lift__stage';
@@ -190,13 +160,13 @@ export class LiftVisual implements SpeedVisual {
     this.root.dataset.drive = direction;
 
     if (this.reducedMotion.matches) {
-      this.seat(CROSS_FOR[direction], direction === 'down' ? LEVER.seatDown : LEVER.seatUp);
+      this.gear.seat(direction);
       this.paint();
       return;
     }
     // The reversing gear cannot be thrown while the car is still running. If it
     // is finishing its run into a floor, the shift queues behind it.
-    this.car.order(() => this.beginShift(direction));
+    this.car.order(() => this.gear.begin(direction));
     this.startLoop();
   }
 
@@ -250,23 +220,6 @@ export class LiftVisual implements SpeedVisual {
     return Math.round(Math.max(this.car.busyMs, swing));
   }
 
-  private beginShift(direction: Drive): void {
-    this.crossFrom = this.cross;
-    this.crossTo = CROSS_FOR[direction];
-    this.leverFrom = this.leverAngle;
-    this.leverTo = direction === 'down' ? LEVER.seatDown : LEVER.seatUp;
-    this.shiftT = 0;
-    this.root.dataset.shifting = 'true';
-    this.startLoop();
-  }
-
-  private seat(cross: number, lever: number): void {
-    this.shiftT = 1;
-    this.cross = this.crossFrom = this.crossTo = cross;
-    this.leverAngle = this.leverFrom = this.leverTo = lever;
-    this.root.dataset.shifting = 'false';
-  }
-
   reset(): void {
     // Back to the resting colour. The upload leaves the machine on the
     // tertiary accent, and nothing else puts it back.
@@ -275,7 +228,7 @@ export class LiftVisual implements SpeedVisual {
     this.reading = null;
     this.driveSign = -1;
     this.root.dataset.drive = 'up';
-    this.seat(CROSS_FOR.up, LEVER.seatUp);
+    this.gear.seat('up');
     this.setProgress(0);
     // Nothing queued from the last run survives into this one.
     this.car.clear();
@@ -300,8 +253,6 @@ export class LiftVisual implements SpeedVisual {
       const fall = this.shownFraction > 0 ? this.returnMs : 0;
       if (fall > 0 || Math.abs(CAR_REST - this.car.position) >= 0.5) this.car.home(fall);
     }
-    this.shiftT = 1;
-    this.root.dataset.shifting = 'false';
     this.startLoop();
     this.paint();
   }
@@ -401,25 +352,21 @@ export class LiftVisual implements SpeedVisual {
       const moved = this.shownFraction - this.lastFraction;
       this.lastFraction = this.shownFraction;
 
-      if (this.shiftT < 1) {
-        this.shiftT = Math.min(1, this.shiftT + dt / SHIFT_MS);
-        if (this.shiftT === 1) this.root.dataset.shifting = 'false';
-      }
+      this.gear.update(dt);
       // The brake holds the sheave for the whole throw, so the needle's move
-      // reaches nothing; the car itself declines it while the machine has it.
-      if (this.shiftT >= 1) this.turn(moved);
+      // reaches nothing; the car declines it too while the machine has it.
+      if (!this.gear.holding) this.turn(moved);
       this.car.update(dt);
 
       const settled =
         Math.abs(aim - before) < 0.0005 &&
-        this.shiftT === 1 &&
+        !this.gear.throwing &&
         this.returnT === 1 &&
         this.car.free;
       if (settled) {
         this.shown = this.target;
         this.turn(aim - this.shownFraction);
-        this.shownFraction = aim;
-        this.lastFraction = aim;
+        this.shownFraction = this.lastFraction = aim;
       }
       this.paint();
 
@@ -432,105 +379,16 @@ export class LiftVisual implements SpeedVisual {
     this.frame = requestAnimationFrame(step);
   }
 
-  /** One strand of the belt, bowed by however slack it is mid-shift. */
-  private strandShape(
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-    slack: number,
-  ): string {
-    const midX = (from.x + to.x) / 2;
-    const midY = (from.y + to.y) / 2;
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const length = Math.max(1, Math.hypot(dx, dy));
-    const bow = slack * 9;
-    return (
-      `M ${from.x.toFixed(2)} ${from.y.toFixed(2)} ` +
-      `Q ${(midX - (dy / length) * bow).toFixed(2)} ${(midY + (dx / length) * bow).toFixed(2)} ` +
-      `${to.x.toFixed(2)} ${to.y.toFixed(2)}`
-    );
-  }
-
-  /** Control rope: lever pin, car outrigger, up the shaft, over the guide pulley, onto the fork drum. */
-  private ropeShape(carTop: number, leverDegrees: number, forkDegrees: number): string {
-    const lever = toRadians(leverDegrees);
-    const pin = {
-      x: LEVER.x + LEVER.arm * Math.sin(lever),
-      y: carTop + LEVER.y - LEVER.arm * Math.cos(lever),
-    };
-    const tangent = tangentPoint(PULLEY, FORK, SHIFT_DRUM_R, 1);
-    const madeOff = drumPin(FORK, SHIFT_DRUM_R, toRadians(ROPE_PIN_BASE), toRadians(forkDegrees));
-    const wrap = wrapTau(bearing(FORK, madeOff) - bearing(FORK, tangent));
-    const leaves = polar(
-      PULLEY,
-      PULLEY.r,
-      bearing(PULLEY, tangent) -
-        Math.acos(PULLEY.r / Math.hypot(tangent.x - PULLEY.x, tangent.y - PULLEY.y)),
-    );
-    return (
-      `M ${pin.x.toFixed(2)} ${pin.y.toFixed(2)}` +
-      ` L 89 ${(carTop + 9).toFixed(2)}` +
-      ` L ${CAR.x - CAR.w / 2} ${(carTop + 14).toFixed(2)}` +
-      ` L ${ROPE_RUN_X.toFixed(2)} ${(carTop + 14).toFixed(2)}` +
-      ` L ${ROPE_RUN_X.toFixed(2)} ${PULLEY.y.toFixed(2)}` +
-      ` A ${PULLEY.r} ${PULLEY.r} 0 0 1 ${leaves.x.toFixed(2)} ${leaves.y.toFixed(2)}` +
-      ` L ${tangent.x.toFixed(2)} ${tangent.y.toFixed(2)}` +
-      ` A ${SHIFT_DRUM_R} ${SHIFT_DRUM_R} 0 ${wrap > Math.PI ? 1 : 0} 1 ${madeOff.x.toFixed(2)} ${madeOff.y.toFixed(2)}`
-    );
-  }
-
   private paint(): void {
     const fraction = this.shownFraction;
-    const shift = this.shiftT;
 
-    // --- the throw ---
-    const crossProgress = easeInOut(stage(shift, STAGE.cross));
-    this.cross = lerp(this.crossFrom, this.crossTo, crossProgress);
-    this.leverAngle = lerp(this.leverFrom, this.leverTo, easeOutBack(stage(shift, STAGE.lever)));
-    const grip = easeInOut(stage(shift, STAGE.reach)) * (1 - easeInOut(stage(shift, STAGE.release)));
-    const braked = clamp(
-      easeInOut(stage(shift, STAGE.brake)) - easeInOut(stage(shift, STAGE.unbrake)),
-      0,
-      1,
-    );
-
-    // --- rotations ---
+    // --- the gear pair the needle turns, permanently in mesh ---
     const hubPhase = toRadians(START_ANGLE + fraction * SWEEP);
     const layPhase = -hubPhase * (HUB.teeth / LAY.teeth);
     this.scene.transform('hub', `rotate(${toDegrees(hubPhase).toFixed(2)})`);
     this.scene.transform('lay', `rotate(${toDegrees(layPhase).toFixed(2)})`);
 
-    // --- the belt, and the fork walking it across ---
-    const slack = Math.sin(Math.PI * clamp(crossProgress, 0, 1));
-    const [a, b] = strands(DRIVE, DRIVEN, this.cross);
-    this.scene.path('beltA', this.strandShape(a.from, a.to, slack));
-    this.scene.path('beltB', this.strandShape(b.from, b.to, -slack));
-
-    const forkAngle = FORK.open + this.cross * (FORK.crossed - FORK.open);
-    this.scene.transform('shifter', `rotate(${forkAngle.toFixed(2)} ${FORK.x} ${FORK.y})`);
-    this.scene.transform('lever', `rotate(${this.leverAngle.toFixed(2)} ${LEVER.x} ${LEVER.y})`);
-    this.scene.transform('arm', grip > 0.002 ? armTransform(this.leverAngle, grip) : '');
-
-    // --- brake, detent, rope, spring ---
-    const brakeDir = toRadians(BRAKE.angle);
-    this.scene.transform(
-      'brakeShoe',
-      `translate(${(-Math.cos(brakeDir) * BRAKE.lift * braked).toFixed(2)} ${(-Math.sin(brakeDir) * BRAKE.lift * braked).toFixed(2)})`,
-    );
-    this.scene.flag('braked', braked > 0.5);
-
-    const lift = detentLift(forkAngle, [FORK.open, FORK.crossed], PAWL_LIFT, PAWL_WIDTH);
-    const pawlDir = toRadians(PAWL_ANGLE);
-    this.scene.transform(
-      'pawl',
-      `translate(${(Math.cos(pawlDir) * lift).toFixed(2)} ${(Math.sin(pawlDir) * lift).toFixed(2)})`,
-    );
-
-    this.scene.path('rope', this.ropeShape(this.car.position, this.leverAngle, forkAngle));
-    const springPin = drumPin(FORK, SPRING_PIN_R, toRadians(SPRING_PIN_BASE), toRadians(forkAngle));
-    this.scene.path('spring', springOutline(SPRING_ANCHOR, springPin));
-
-    // --- the shaft, and the dial ---
+    this.linkage.place(this.scene);
     this.shaft.place(this.scene);
     this.scene.attr('valueArc', 'stroke-dashoffset', String(ARC_LENGTH * (1 - fraction)));
     this.scene.quantity('lift-effort', fraction.toFixed(3));
