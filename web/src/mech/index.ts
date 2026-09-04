@@ -4,6 +4,7 @@
  * generation for all of it. Nothing in here knows about the speedtest.
  */
 export * from './drive';
+export * from './part';
 export * from './geometry';
 export * from './gear';
 export * from './rope';
