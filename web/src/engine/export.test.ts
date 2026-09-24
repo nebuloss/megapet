@@ -88,15 +88,26 @@ describe('columns follow the data', () => {
 });
 
 describe('the exported filename', () => {
-  it('says what was measured', () => {
-    expect(exportFilename(meta({ directions: { down: true, up: false } }))).toContain('download');
-    expect(exportFilename(meta({ directions: { down: false, up: true } }))).toContain('upload');
-    expect(exportFilename(meta())).toContain('both');
+  it('is the date and time, and nothing else', () => {
+    expect(exportFilename(meta())).toMatch(/^megapet-\d{4}-\d{2}-\d{2}-\d{4}\.csv$/);
   });
 
-  it('sorts chronologically and is safe on any filesystem', () => {
-    const name = exportFilename(meta());
-    expect(name).toMatch(/^megapet-manual-both-2026-03-04T14-32-10Z\.csv$/);
-    expect(name).not.toMatch(/[:*?"<>|]/);
+  /**
+   * Which directions were measured is already in the columns; repeating it
+   * only made the name longer to read and to type.
+   */
+  it('does not repeat what the columns already say', () => {
+    const name = exportFilename(meta({ directions: { down: true, up: false } }));
+    expect(name).not.toMatch(/download|upload|both|manual/);
+  });
+
+  it('sorts chronologically', () => {
+    const earlier = exportFilename(meta({ startedAt: new Date('2026-03-04T09:00:00') }));
+    const later = exportFilename(meta({ startedAt: new Date('2026-03-04T14:32:00') }));
+    expect([later, earlier].sort()).toEqual([earlier, later]);
+  });
+
+  it('is safe on any filesystem', () => {
+    expect(exportFilename(meta())).not.toMatch(/[:*?"<>|/\\]/);
   });
 });

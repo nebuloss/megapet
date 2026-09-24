@@ -57,17 +57,20 @@ export function toCsv(points: readonly SeriesPoint[], meta: ExportMeta): string 
 }
 
 /** A filename that sorts chronologically and says what it holds. */
+/**
+ * A filename that sorts chronologically and says nothing the file does not.
+ *
+ * Just the date and time: which directions were measured is already in the
+ * columns, so repeating it in the name only made it longer to read and to
+ * type. Local time rather than UTC, because the name is matched against when
+ * you remember running the test.
+ */
 export function exportFilename(meta: ExportMeta): string {
-  const stamp = meta.startedAt
-    .toISOString()
-    .replace(/[:.]/g, '-')
-    .replace(/-\d{3}Z$/, 'Z');
-  const what = meta.directions.down && meta.directions.up
-    ? 'both'
-    : meta.directions.down
-      ? 'download'
-      : 'upload';
-  return `megapet-manual-${what}-${stamp}.csv`;
+  const d = meta.startedAt;
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}${pad(d.getMinutes())}`;
+  return `megapet-${date}-${time}.csv`;
 }
 
 /**
