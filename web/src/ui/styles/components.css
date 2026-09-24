@@ -474,6 +474,31 @@
   margin-right: auto;
 }
 
+/*
+ * A heading for the second half of a panel.
+ *
+ * Quieter than the section's own title, and separated by a rule: the aggregate
+ * figures above and the individual runs below are different kinds of number,
+ * and without the break a monthly average reads as though it belonged to the
+ * test listed under it.
+ */
+.section__head--sub {
+  margin-top: 1.25rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--md-sys-color-outline-variant, var(--md-sys-color-outline));
+}
+
+.section__subtitle {
+  font: var(--md-sys-typescale-title-small);
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0 auto 0 0;
+}
+
+.section__count {
+  font: var(--md-sys-typescale-label-small);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 /* --------------------------------------------------------------- history */
 
 .summary-row {

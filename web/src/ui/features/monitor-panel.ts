@@ -559,9 +559,11 @@ export class MonitorPanel extends Component<HTMLElement> {
         running ? 'Pause' : blocked ? 'Speed test running' : idle ? 'Nothing selected' : idleLabel,
       ),
     );
+    // Names the shortcut where the control is, which is the only place
+    // anyone looks for one.
     this.startButton.title = blocked
       ? 'Wait for the speed test to finish — both would be measuring the same link.'
-      : '';
+      : 'Space';
     this.updateExportButton();
   }
 
@@ -965,8 +967,8 @@ export class MonitorPanel extends Component<HTMLElement> {
       button.title = locked
         ? 'The speed test chooses its own directions; this shows what it is doing.'
         : key === 'down'
-          ? 'Pull data from the server'
-          : 'Push data to the server';
+          ? 'Pull data from the server (D)'
+          : 'Push data to the server (U)';
       const state = button.querySelector('.monitor__direction-state');
       // Said in words as well as in position, so the state does not depend on
       // seeing where a small thumb sits.

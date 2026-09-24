@@ -40,10 +40,34 @@ export class HistoryPanel extends Component {
     this.root.replaceChildren();
   }
 
+  /**
+   * Two halves, each named.
+   *
+   * The panel used to carry one heading over both, so the aggregate figures
+   * and the individual runs ran together — a reader had no way to tell that
+   * "132 Mbps" was an average of a month and the row beneath it was a single
+   * test. Naming each says which is which, and the rule between them marks
+   * where the scrolling list begins.
+   */
   private render(results: StoredResult[], summary: Summary): void {
+    const strip = HistoryPanel.summaryStrip(summary);
     const children: (HTMLElement | null)[] = [
-      el('div', { class: 'section__head' }, el('h2', { class: 'section__title' }, 'Recent tests')),
-      HistoryPanel.summaryStrip(summary),
+      strip
+        ? el(
+            'div',
+            { class: 'section__head' },
+            el('h2', { class: 'section__title' }, `Last ${WINDOW_DAYS} days`),
+          )
+        : null,
+      strip,
+      el(
+        'div',
+        { class: 'section__head section__head--sub' },
+        el('h3', { class: 'section__subtitle' }, 'Recent tests'),
+        results.length > 0
+          ? el('span', { class: 'section__count' }, `${results.length} shown`)
+          : null,
+      ),
       this.list(results),
     ];
     this.root.replaceChildren(...children.filter((c): c is HTMLElement => c !== null));
@@ -58,7 +82,8 @@ export class HistoryPanel extends Component {
     return el(
       'dl',
       { class: 'summary-row' },
-      cell(`Tests (${WINDOW_DAYS}d)`, String(summary.count)),
+      // Just "Tests": the window is named by the heading above this strip.
+      cell('Tests', String(summary.count)),
       cell('Avg download', `${formatSpeed(summary.avg_download_mbps)} Mbps`),
       cell('Avg upload', `${formatSpeed(summary.avg_upload_mbps)} Mbps`),
       cell('Best download', `${formatSpeed(summary.max_download_mbps)} Mbps`),

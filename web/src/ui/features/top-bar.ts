@@ -93,7 +93,7 @@ export class TopBar extends Component<HTMLElement> {
       type: 'button',
       'data-control': 'graph',
       'aria-pressed': 'false',
-      title: 'Graph',
+      title: 'Graph (G)',
       'aria-label': 'Show the graph of everything measured so far',
       html: icon('jitter'),
     }) as HTMLButtonElement;
