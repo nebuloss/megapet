@@ -435,11 +435,6 @@ export class MonitorPanel extends Component<HTMLElement> {
     this.emptyNote.hidden = true;
 
     const directions = this.directions;
-    if (!directions.down && !directions.up) {
-      this.deps.notify('Choose a direction to measure first.');
-      this.setRunning(false);
-      return;
-    }
     this.deps.announce(`Manual mode started: ${describeDirections(directions)}.`);
 
     // The same monitor is reused, so stopping and starting resumes its graph
@@ -548,15 +543,21 @@ export class MonitorPanel extends Component<HTMLElement> {
 
     const idle = !this.directions.down && !this.directions.up;
     const blocked = this.blocked !== null && !running;
-    // Nothing to start when neither direction is selected, and the button
-    // says which it is rather than simply refusing.
-    this.startButton.disabled = blocked || (idle && !running);
+    // A session with nothing selected is allowed: it records an idle link,
+    // which is the baseline a later reading is read against.
+    this.startButton.disabled = blocked;
     this.startButton.innerHTML = icon(running ? 'stop' : 'speed');
     // "Resume" once there is a graph to continue, because that is what it does.
     const idleLabel = this.monitor.history.all.length > 0 ? 'Resume' : 'Start monitoring';
     this.startButton.append(
       document.createTextNode(
-        running ? 'Pause' : blocked ? 'Speed test running' : idle ? 'Nothing selected' : idleLabel,
+        running
+          ? 'Pause'
+          : blocked
+            ? 'Speed test running'
+            : idle
+              ? 'Watch idle link'
+              : idleLabel,
       ),
     );
     // Names the shortcut where the control is, which is the only place
@@ -636,8 +637,15 @@ export class MonitorPanel extends Component<HTMLElement> {
     // appending a point beyond the window leaves the curve's last control
     // point drifting, so the picture never quite settles.
     if (live && this.viewport.isFocused) {
-      this.edge.down.setTarget(this.live.down);
-      this.edge.up.setTarget(this.live.up);
+      // A direction carrying nothing is *at* zero, not on its way there. The
+      // edge eases, so easing it down from the last reading drew the pen above
+      // a line already on the floor: a dip and a climb back over a second or
+      // so, describing a fall the link never made. Only a direction still
+      // moving bytes is worth easing.
+      if (this.live.down > 0) this.edge.down.setTarget(this.live.down);
+      else this.edge.down.reset();
+      if (this.live.up > 0) this.edge.up.setTarget(this.live.up);
+      else this.edge.up.reset();
       // Never behind the last committed sample. The clock and the samples come
       // from different places, so around a stop the provisional point can land
       // *before* the final sample — which gives the spline a segment that runs
@@ -945,7 +953,6 @@ export class MonitorPanel extends Component<HTMLElement> {
   /** Starts or stops a session, for the keyboard shortcut. */
   toggleRun(): boolean {
     if (this.blocked !== null) return false;
-    if (!this.running && !this.directions.down && !this.directions.up) return false;
     this.toggle();
     return true;
   }
@@ -958,6 +965,10 @@ export class MonitorPanel extends Component<HTMLElement> {
     // the link settle. A session with neither is simply idle.
     this.directions = { ...this.directions, [key]: !this.directions[key] };
     this.paintDirections();
+    // The primary button names what it will start, which changes with the
+    // selection — "Watch idle link" once nothing is on — so it is repainted
+    // here and not only when a session starts or stops.
+    this.setRunning(this.running);
     // Mid-session this starts or stops that direction without disturbing the
     // other, the clock or the history.
     if (this.running) this.monitor.setDirections(this.directions);

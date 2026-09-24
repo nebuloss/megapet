@@ -343,13 +343,14 @@ export class Monitor {
    * Runs until `stop`, then resolves. Rejects for nothing: a link that fails
    * is reported through `onError` and ends the session, because a monitor that
    * throws after ten minutes has thrown away ten minutes of graph.
+   *
+   * Starting with no direction selected is allowed. The session opens, the
+   * clock runs and the graph draws a floor, which is a real thing to want:
+   * watch an idle link for a minute, then switch a direction on and see the
+   * difference against a baseline you actually recorded.
    */
   async start(directions: Directions, handlers: MonitorHandlers): Promise<void> {
     if (this.running) return;
-    if (!directions.down && !directions.up) {
-      throw new RangeError('Monitor: at least one direction must be selected');
-    }
-
     this.running = true;
     this.stopping = false;
     this.handlers = handlers;

@@ -48,14 +48,21 @@ describe('a session with nothing selected', () => {
     expect(monitor.isRunning).toBe(false);
   });
 
-  it('refuses to begin with nothing selected, rather than idling', async () => {
+  /**
+   * Starting with nothing selected records an idle link, which is the
+   * baseline a later reading is read against.
+   */
+  it('begins with nothing selected, and runs', async () => {
     const monitor = new Monitor(params, 'http://127.0.0.1:1');
-    await expect(
-      monitor.start(
-        { down: false, up: false },
-        { onUpdate: () => {}, onSample: () => {}, onError: () => {} },
-      ),
-    ).rejects.toThrow(RangeError);
+    const started = monitor.start(
+      { down: false, up: false },
+      { onUpdate: () => {}, onSample: () => {}, onError: () => {} },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(monitor.isRunning).toBe(true);
+    monitor.stop();
+    await started;
+    expect(monitor.isRunning).toBe(false);
   });
 });
 

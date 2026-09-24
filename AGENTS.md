@@ -206,6 +206,12 @@ Non-obvious frontend invariants:
   drawn as a provisional point at "now" (`ui/visuals/leading-edge.ts`), for
   *whichever* test is running. Drawn only from committed samples the line grows
   in once-a-second jumps, which is the staircase this removes.
+- **A direction carrying nothing is *at* zero, not easing towards it.** The
+  leading edge eases, so easing it down from the last reading leaves the pen
+  above a line already on the floor — a dip and a climb back, describing a
+  fall the link never made. Only a direction still moving bytes is eased.
+- **A manual session may start with nothing selected.** It records an idle
+  link, which is the baseline a later reading is read against.
 - **The leading point is never behind the newest sample.** Its time comes from
   a clock and the samples come from the engine, so around a stop the
   provisional point can land *before* the final sample — which gives the
