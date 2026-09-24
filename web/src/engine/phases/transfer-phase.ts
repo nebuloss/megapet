@@ -24,6 +24,14 @@ export interface TransferTick {
 
 export interface TransferOptions {
   readonly base: string;
+  /**
+   * The run these bytes belong to, if the server opened one.
+   *
+   * Quoted on every request so the server can attribute what it counts. It is
+   * the only thing the client tells the server about the measurement — the
+   * figures come from the server's own count.
+   */
+  readonly run?: string;
   readonly streams: number;
   /**
    * How long to measure for.
@@ -169,6 +177,11 @@ export abstract class TransferPhase {
   /** A cache-busting suffix, so no request can be served from a cache. */
   protected static nonce(index: number, attempt: number): string {
     return `${Date.now().toString(36)}-${index}-${attempt}`;
+  }
+
+  /** The run parameter, ready to append. Empty when no run is open. */
+  protected get runParam(): string {
+    return this.options.run ? `&session=${encodeURIComponent(this.options.run)}` : '';
   }
 
   protected static isAbort(error: unknown): boolean {

@@ -87,6 +87,8 @@ export class SpeedTest {
     private readonly params: TestParams,
     private readonly base = '',
     private readonly pacing: Pacing = {},
+    /** The server-side run these transfers belong to, if one was opened. */
+    private readonly runId?: string,
   ) {}
 
   get isRunning(): boolean {
@@ -159,6 +161,7 @@ export class SpeedTest {
       emit({ phase: 'download' });
       const download: TransferResult = await new DownloadPhase({
         base: this.base,
+        ...(this.runId ? { run: this.runId } : {}),
         streams: this.params.download_streams,
         durationMs: this.params.download_seconds * 1000,
         graceMs: this.params.grace_seconds * 1000,
@@ -185,6 +188,7 @@ export class SpeedTest {
       emit({ phase: 'upload', liveMbps: 0 });
       const upload: TransferResult = await new UploadPhase({
         base: this.base,
+        ...(this.runId ? { run: this.runId } : {}),
         streams: this.params.upload_streams,
         durationMs: this.params.upload_seconds * 1000,
         graceMs: this.params.grace_seconds * 1000,

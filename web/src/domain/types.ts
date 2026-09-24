@@ -45,10 +45,6 @@ export interface StoredResult {
   created_at: string;
   download_mbps: number;
   upload_mbps: number;
-  ping_ms: number;
-  jitter_ms: number;
-  ping_min_ms: number;
-  ping_max_ms: number;
   download_bytes: number;
   upload_bytes: number;
   client_ip?: string;
@@ -69,8 +65,6 @@ export interface Summary {
   since?: string;
   avg_download_mbps: number;
   avg_upload_mbps: number;
-  avg_ping_ms: number;
   max_download_mbps: number;
   max_upload_mbps: number;
-  min_ping_ms: number;
 }

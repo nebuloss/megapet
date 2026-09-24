@@ -23,7 +23,7 @@ export class DownloadPhase extends TransferPhase {
     await this.withRetries(signal, async (failures) => {
       const url =
         `${this.options.base}/api/download?bytes=${REQUEST_BYTES}` +
-        `&r=${TransferPhase.nonce(index, failures)}`;
+        `&r=${TransferPhase.nonce(index, failures)}${this.runParam}`;
 
       const response = await fetch(url, { cache: 'no-store', signal });
       if (!response.ok) throw new Error(`download endpoint returned ${response.status}`);

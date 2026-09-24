@@ -41,6 +41,15 @@ func New(cfg config.Config, log *slog.Logger, db *store.DB, reg *metrics.Registr
 	if err != nil {
 		return nil, err
 	}
+	// Behind a reverse proxy with no trusted proxies configured, every visitor
+	// resolves to the proxy's own address. Everything still works, silently and
+	// wrongly: they share one per-IP stream budget, they can reach each other's
+	// runs, and the recorded client address is the proxy's. Worth saying out
+	// loud, since nothing else about the deployment looks broken.
+	if len(cfg.TrustedProxies) == 0 {
+		log.Warn("no trusted_proxies configured: forwarding headers are ignored, " +
+			"so behind a reverse proxy every client will look like the proxy")
+	}
 	limiter := speed.NewLimiter(cfg.Limits.MaxStreamsPerIP, cfg.Limits.MaxStreamsTotal)
 	sh, err := speed.NewHandler(cfg.Limits.MaxBytesPerRequest, limiter)
 	if err != nil {

@@ -11,20 +11,26 @@ export class ApiError extends Error {
   }
 }
 
-export interface Submission {
-  download_mbps: number;
-  upload_mbps: number;
-  ping_ms: number;
-  jitter_ms: number;
-  ping_min_ms: number;
-  ping_max_ms: number;
-  download_bytes: number;
-  upload_bytes: number;
-  platform: string;
+/**
+ * What a client may label a run with when closing it.
+ *
+ * Note what is absent: any figure. The server measures the run itself, so
+ * there is nothing here to report and nothing it would believe. These are
+ * presentation only.
+ */
+export interface RunLabels {
   server_id: string;
   server_name: string;
   note: string;
 }
+
+/** A run the server has opened and is measuring. */
+export interface OpenRun {
+  id: string;
+}
+
+/** What closing a run returns: a stored result, or nothing worth storing. */
+export type RunOutcome = StoredResult | { stored: false };
 
 export interface ListOptions {
   limit?: number;
@@ -61,11 +67,17 @@ export class ApiClient {
     return this.get('/api/ip');
   }
 
-  saveResult(body: Submission): Promise<StoredResult> {
-    return this.request('/api/results', {
+  /** Opens a run. Its id goes on every measurement request that follows. */
+  openRun(): Promise<OpenRun> {
+    return this.request('/api/runs', { method: 'POST' });
+  }
+
+  /** Closes a run, and with it the server's measurement of the link. */
+  closeRun(id: string, labels: RunLabels): Promise<RunOutcome> {
+    return this.request(`/api/runs/${encodeURIComponent(id)}/close`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(labels),
     });
   }
 

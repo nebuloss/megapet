@@ -2,7 +2,7 @@ import type { ApiClient } from '../../api';
 import { Component } from '../../core';
 import type { StoredResult, Summary } from '../../domain/types';
 import { el, hydrateRipples } from '../primitives/dom';
-import { formatMs, formatRelative, formatSpeed } from '../primitives/format';
+import { formatRelative, formatSpeed } from '../primitives/format';
 import { icon } from '../primitives/icons';
 
 const WINDOW_DAYS = 30;
@@ -61,7 +61,7 @@ export class HistoryPanel extends Component {
       cell(`Tests (${WINDOW_DAYS}d)`, String(summary.count)),
       cell('Avg download', `${formatSpeed(summary.avg_download_mbps)} Mbps`),
       cell('Avg upload', `${formatSpeed(summary.avg_upload_mbps)} Mbps`),
-      cell('Best ping', `${formatMs(summary.min_ping_ms)} ms`),
+      cell('Best download', `${formatSpeed(summary.max_download_mbps)} Mbps`),
     );
   }
 
@@ -91,7 +91,6 @@ export class HistoryPanel extends Component {
           { class: 'list-row__figures tnum' },
           HistoryPanel.figure('download', formatSpeed(result.download_mbps)),
           HistoryPanel.figure('upload', formatSpeed(result.upload_mbps)),
-          HistoryPanel.figure('latency', formatMs(result.ping_ms)),
         ),
       );
       row.addEventListener('click', () => this.onSelect(result));

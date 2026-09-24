@@ -40,7 +40,8 @@ export class UploadPhase extends TransferPhase {
   protected async transfer(meter: RateMeter, signal: AbortSignal, index: number): Promise<void> {
     await this.withRetries(signal, async (failures) => {
       const url =
-        `${this.uploadOptions.base}/api/upload?r=${TransferPhase.nonce(index, failures)}`;
+        `${this.uploadOptions.base}/api/upload?r=${TransferPhase.nonce(index, failures)}` +
+        this.runParam;
       await this.post(url, meter, signal);
     });
   }

@@ -3,7 +3,7 @@ import { Component } from '../../core';
 import type { StoredResult } from '../../domain/types';
 import type { Snackbar } from '../components';
 import { el, hydrateRipples } from '../primitives/dom';
-import { formatBytes, formatDateTime, formatMs, formatSpeed } from '../primitives/format';
+import { formatBytes, formatDateTime, formatSpeed } from '../primitives/format';
 import { icon } from '../primitives/icons';
 import { SharePanel } from './share-panel';
 import { StatTiles } from './stat-tiles';
@@ -37,8 +37,8 @@ export class ResultView extends Component<HTMLElement> {
     const tiles = new StatTiles();
     tiles.set('download', formatSpeed(result.download_mbps));
     tiles.set('upload', formatSpeed(result.upload_mbps));
-    tiles.set('ping', formatMs(result.ping_ms));
-    tiles.set('jitter', formatMs(result.jitter_ms));
+    // No latency here: a round trip can only be timed by the end that starts
+    // it, so the server never observed one and a stored result has none.
 
     const meta = [
       formatDateTime(result.created_at),
@@ -51,8 +51,7 @@ export class ResultView extends Component<HTMLElement> {
 
     const transferred =
       `Transferred ${formatBytes(result.download_bytes)} down and ` +
-      `${formatBytes(result.upload_bytes)} up · ` +
-      `ping ${formatMs(result.ping_min_ms)}–${formatMs(result.ping_max_ms)} ms`;
+      `${formatBytes(result.upload_bytes)} up`;
 
     this.root.replaceChildren(
       el(

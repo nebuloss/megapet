@@ -185,6 +185,8 @@ export class Monitor {
   constructor(
     private readonly params: TestParams,
     private readonly base = '',
+    /** The server-side run these transfers belong to, if one was opened. */
+    private readonly runId?: string,
   ) {
     const overhead = params.overhead_factor || 1;
     const graceMs = params.grace_seconds * 1000;
@@ -193,6 +195,7 @@ export class Monitor {
       down: new Leg('down', (signal, onTick) =>
         new DownloadPhase({
           base: this.base,
+          ...(this.runId ? { run: this.runId } : {}),
           streams: params.download_streams,
           durationMs: Infinity,
           graceMs,
@@ -204,6 +207,7 @@ export class Monitor {
       up: new Leg('up', (signal, onTick) =>
         new UploadPhase({
           base: this.base,
+          ...(this.runId ? { run: this.runId } : {}),
           streams: params.upload_streams,
           durationMs: Infinity,
           graceMs,

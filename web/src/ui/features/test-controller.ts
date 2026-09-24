@@ -1,4 +1,4 @@
-import type { ApiClient, Submission } from '../../api';
+import type { ApiClient, RunLabels } from '../../api';
 import type { Peer, StoredResult, TestParams } from '../../domain/types';
 import { SpeedTest, type Phase, type Snapshot } from '../../engine/runner';
 import { TimeSeries } from '../../engine/series';
@@ -15,7 +15,7 @@ const LOADS: Partial<Record<Phase, Directions>> = {
   download: { down: true, up: false },
   upload: { down: false, up: true },
 };
-import { describePlatform, formatMs, formatRate } from '../primitives/format';
+import { formatMs, formatRate } from '../primitives/format';
 import type { IconName } from '../primitives/icons';
 import type { Drive, GaugeAccent, SpeedVisual } from '../visuals';
 import type { StatKey, StatTiles } from './stat-tiles';
@@ -112,6 +112,8 @@ export interface TestControllerDeps {
  */
 export class TestController {
   private test: SpeedTest | null = null;
+  /** The server-side run this test is being measured as. */
+  private runId: string | null = null;
   /**
    * Every run so far, sampled as it happens, on one timeline.
    *
@@ -157,14 +159,31 @@ export class TestController {
     setRunning(true);
 
     const base = peer ? this.deps.api.withBase(peer.url) : this.deps.api;
+
+    // Opened before any bytes move, so the server can attribute them. A server
+    // that cannot open one is not a reason to refuse to measure: the test
+    // still runs and shows live figures, it simply is not recorded.
+    this.runId = null;
+    if (this.deps.storeEnabled) {
+      try {
+        this.runId = (await base.openRun()).id;
+      } catch {
+        this.deps.notify('This run will not be recorded.');
+      }
+    }
     // Both are asked after reset(), so they describe the moves it just began.
     // open() starts the car up the shaft; it queues behind the settle, so the
     // ping is taken while the car rides rather than while the needle falls.
-    this.test = new SpeedTest(this.deps.params, base.url(''), {
-      openingMs: target.settleMs(),
-      latencyMs: target.open(),
-      reverseMs: target.transitionMs,
-    });
+    this.test = new SpeedTest(
+      this.deps.params,
+      base.url(''),
+      {
+        openingMs: target.settleMs(),
+        latencyMs: target.open(),
+        reverseMs: target.transitionMs,
+      },
+      this.runId ?? undefined,
+    );
 
     let lastPhase: Phase = 'idle';
     const snapshot = await this.test.run((s) => {
@@ -214,7 +233,7 @@ export class TestController {
       `Test complete. Download ${spoken(snapshot.downloadMbps)}, ` +
         `upload ${spoken(snapshot.uploadMbps)}, ping ${formatMs(snapshot.pingMs)} milliseconds.`,
     );
-    await this.persist(snapshot, peer);
+    await this.persist(peer);
   }
 
   private applyPhase(snapshot: Snapshot, visual: SpeedVisual): void {
@@ -339,30 +358,33 @@ export class TestController {
     this.recording.add({ t: this.timeline, down: 0, up: 0 });
   }
 
-  private async persist(snapshot: Snapshot, peer: Peer | null): Promise<void> {
-    if (!this.deps.storeEnabled) return;
+  /**
+   * Closes the run, which is what makes the server write its measurement.
+   *
+   * Nothing is sent but labels. The figures in the history are the ones the
+   * server counted while the bytes moved, so this cannot report a result — it
+   * can only say the run is over and let the server record what it saw.
+   */
+  private async persist(peer: Peer | null): Promise<void> {
+    const run = this.runId;
+    this.runId = null;
+    if (!run) return;
 
-    const body: Submission = {
-      download_mbps: snapshot.downloadMbps,
-      upload_mbps: snapshot.uploadMbps,
-      ping_ms: snapshot.pingMs,
-      jitter_ms: snapshot.jitterMs,
-      ping_min_ms: snapshot.pingMinMs,
-      ping_max_ms: snapshot.pingMaxMs,
-      download_bytes: snapshot.downloadBytes,
-      upload_bytes: snapshot.uploadBytes,
-      platform: describePlatform(),
+    const labels: RunLabels = {
       server_id: peer?.id ?? '',
       server_name: peer?.name ?? 'This server',
       note: '',
     };
 
     try {
-      // Always saved to this server, whichever backend was measured against.
-      this.deps.onSaved(await this.deps.api.saveResult(body));
+      const outcome = await this.deps.api.closeRun(run, labels);
+      // A run too short to outlast the grace period has no honest figure, so
+      // the server stores nothing and there is nothing to show.
+      if ('stored' in outcome) return;
+      this.deps.onSaved(outcome);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      this.deps.notify(`Result not saved: ${detail}`);
+      this.deps.notify(`Result not recorded: ${detail}`);
     }
   }
 }
