@@ -5,13 +5,15 @@ package speed
 import (
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/netip"
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"github.com/nebuloss/megapet/internal/session"
 )
 
 // poolBytes is the size of the pre-generated incompressible payload. Requests
@@ -90,6 +92,11 @@ type Handler struct {
 	OnPing          func()
 	OnRejected      func()
 
+	// Sessions attributes bytes to the run that moved them, so the server can
+	// record what it measured rather than what a client claims. Optional: with
+	// no store, the endpoints still work and only the global counters move.
+	Sessions *session.Store
+
 	uploadBufs sync.Pool
 }
 
@@ -154,9 +161,18 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	head.Set("Content-Length", strconv.FormatInt(size, 10))
 	w.WriteHeader(http.StatusOK)
 
-	// Start each stream at its own offset in the pool.
-	off := int(h.offset.Add(uint64(writeChunk)) % poolBytes)
+	// Start each stream at its own offset in the pool. A small stride gives
+	// thousands of distinct phases rather than the 64 a chunk-sized stride
+	// would, so concurrent streams are far less likely to send identical bytes
+	// in the same order.
+	off := int(h.offset.Add(4096) % (poolBytes - writeChunk))
 	ctx := r.Context()
+
+	sess := h.session(r)
+	if sess != nil {
+		sess.Begin(session.Down, time.Now())
+		defer sess.End(session.Down, time.Now())
+	}
 
 	var sent int64
 	for sent < size {
@@ -173,6 +189,12 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		written, err := w.Write(h.pool[off : off+int(n)])
 		sent += int64(written)
 		off += int(n)
+		// Reported as it goes, not once at the end: a window that excludes the
+		// ramp and the tail can only be drawn if the counter is watched while
+		// it runs.
+		if sess != nil && written > 0 {
+			sess.Add(session.Down, int64(written), time.Now())
+		}
 		if err != nil {
 			break // client hung up; expected at the end of the window
 		}
@@ -180,6 +202,22 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	if h.OnDownloadBytes != nil && sent > 0 {
 		h.OnDownloadBytes(sent)
 	}
+}
+
+// session returns the run this request belongs to, if it named one we know.
+func (h *Handler) session(r *http.Request) *session.Session {
+	if h.Sessions == nil {
+		return nil
+	}
+	id := r.URL.Query().Get("session")
+	if id == "" {
+		return nil
+	}
+	sess, ok := h.Sessions.Get(id, ClientAddr(r))
+	if !ok {
+		return nil
+	}
+	return sess
 }
 
 // Upload consumes and discards the request body, reporting the byte count so
@@ -196,17 +234,30 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	buf := h.uploadBufs.Get().(*[]byte)
 	defer h.uploadBufs.Put(buf)
 
+	sess := h.session(r)
+	if sess != nil {
+		sess.Begin(session.Up, time.Now())
+		defer sess.End(session.Up, time.Now())
+	}
+
 	// io.Discard implements ReaderFrom, which io.CopyBuffer would prefer over
 	// our buffer, falling back to an 8 KiB internal one. Wrapping it in a plain
 	// Writer hides ReaderFrom and keeps the large reads.
 	dst := struct{ io.Writer }{io.Discard}
-	n, err := io.CopyBuffer(dst, io.LimitReader(r.Body, h.maxBytes), *buf)
+	var src io.Reader = io.LimitReader(r.Body, h.maxBytes)
+	if sess != nil {
+		src = &metered{r: src, sess: sess}
+	}
+	n, err := io.CopyBuffer(dst, src, *buf)
 
 	if h.OnUploadBytes != nil && n > 0 {
 		h.OnUploadBytes(n)
 	}
-	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
+	if err != nil {
 		// A client that aborts mid-upload is normal; report what we received.
+		// Every error means the body was cut short, `io.ErrUnexpectedEOF`
+		// included — it used to be routed to the "complete" reply, which told
+		// the client a truncated upload had arrived whole.
 		noStore(w)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -217,6 +268,22 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]any{"bytes": n})
+}
+
+// metered reports bytes to a session as they are read, for the same reason
+// the download loop does: the window that counts needs the counter watched
+// while it runs, not totalled at the end.
+type metered struct {
+	r    io.Reader
+	sess *session.Session
+}
+
+func (m *metered) Read(p []byte) (int, error) {
+	n, err := m.r.Read(p)
+	if n > 0 {
+		m.sess.Add(session.Up, int64(n), time.Now())
+	}
+	return n, err
 }
 
 func (h *Handler) reject(w http.ResponseWriter) {
