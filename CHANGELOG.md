@@ -5,7 +5,7 @@ Notable changes, newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com), and
 versions follow [Semantic Versioning](https://semver.org).
 
-## Unreleased
+## 1.2.1 — 2026-09-24
 
 ### Changed
 
