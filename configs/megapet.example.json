@@ -20,8 +20,8 @@
     "upload_seconds": 10,
     "grace_seconds": 1.5,
     "download_streams": 6,
-    "upload_streams": 4,
-    "upload_chunk_bytes": 8388608,
+    "upload_streams": 6,
+    "upload_chunk_bytes": 16777216,
     "overhead_factor": 1.0
   },
 

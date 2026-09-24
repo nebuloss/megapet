@@ -5,8 +5,22 @@ export interface UploadOptions extends TransferOptions {
   readonly chunkBytes: number;
 }
 
-const MIN_CHUNK = 256 * 1024;
-const MAX_CHUNK = 32 * 1024 * 1024;
+/**
+ * Bounds on a single upload request.
+ *
+ * The floor is what stops per-request turnaround dominating the measurement.
+ * Measured against a local server, six streams of 1 MiB chunks reach about
+ * 8 Gbps where 16 MiB chunks reach 20 — the small requests spend most of
+ * their time being set up and torn down, and the figure that comes out is a
+ * measure of request overhead rather than of the link. 4 MiB is where that
+ * curve flattens.
+ *
+ * The ceiling stops one request outlasting the window it is measured in: at
+ * 64 MiB a request takes over 150ms even on a local link, and on a slow one a
+ * single chunk would never finish.
+ */
+const MIN_CHUNK = 4 * 1024 * 1024;
+const MAX_CHUNK = 64 * 1024 * 1024;
 
 /** `crypto.getRandomValues` caps each call at 64 KiB. */
 const RANDOM_STEP = 65536;

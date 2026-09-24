@@ -164,11 +164,11 @@ export class SpeedTest {
         graceMs: this.params.grace_seconds * 1000,
         overhead: this.params.overhead_factor || 1,
         signal,
-        onTick: (mbps, phaseProgress) => {
+        onTick: ({ liveMbps, progress }) => {
           emit({
-            liveMbps: mbps,
-            downloadMbps: mbps,
-            progress: DOWNLOAD_FROM + phaseProgress * WEIGHTS.download,
+            liveMbps,
+            downloadMbps: liveMbps,
+            progress: DOWNLOAD_FROM + progress * WEIGHTS.download,
           });
         },
       }).run();
@@ -191,11 +191,11 @@ export class SpeedTest {
         overhead: this.params.overhead_factor || 1,
         chunkBytes: this.chunkSizeFor(download.mbps),
         signal,
-        onTick: (mbps, phaseProgress) => {
+        onTick: ({ liveMbps, progress }) => {
           emit({
-            liveMbps: mbps,
-            uploadMbps: mbps,
-            progress: UPLOAD_FROM + phaseProgress * WEIGHTS.upload,
+            liveMbps,
+            uploadMbps: liveMbps,
+            progress: UPLOAD_FROM + progress * WEIGHTS.upload,
           });
         },
       }).run();
@@ -249,7 +249,12 @@ export class SpeedTest {
     }
     const perStreamBytesPerSecond =
       (downloadMbps * 1e6) / 8 / Math.max(1, this.params.upload_streams);
-    return Math.round(perStreamBytesPerSecond * 0.25);
+    // Half a second per request rather than a quarter. The quarter-second
+    // target produced chunks small enough that request turnaround, not the
+    // link, decided the figure — which is why upload read slower than
+    // download on a symmetric connection. `UploadPhase` clamps this to its
+    // own floor and ceiling.
+    return Math.round(perStreamBytesPerSecond * 0.5);
   }
 
   private throwIfAborted(signal: AbortSignal): void {

@@ -141,14 +141,23 @@ func Default() Config {
 		BaseURL: "",
 		Direct:  Direct{Enabled: false},
 		Test: Test{
-			PingCount:        12,
-			PingWarmup:       2,
-			DownloadSeconds:  10,
-			UploadSeconds:    10,
-			GraceSeconds:     1.5,
-			DownloadStreams:  6,
-			UploadStreams:    4,
-			UploadChunkBytes: 8 << 20,
+			PingCount:       12,
+			PingWarmup:      2,
+			DownloadSeconds: 10,
+			UploadSeconds:   10,
+			GraceSeconds:    1.5,
+			DownloadStreams: 6,
+			// Matched to the download deliberately. Four here against six
+			// there handicapped the upload figure by a third on a symmetric
+			// link, which read as "this connection uploads slowly" when what
+			// it actually meant was "this test tried less hard".
+			UploadStreams: 6,
+			// 16 MiB, not 8: measured against a local server, six streams of
+			// small chunks spend most of their time in request setup, and the
+			// figure that comes out measures that overhead rather than the
+			// link. This is only the starting size; the client resizes it
+			// from what the link actually does.
+			UploadChunkBytes: 16 << 20,
 			OverheadFactor:   1.0,
 		},
 		Limits: Limits{
