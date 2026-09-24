@@ -10,6 +10,9 @@
     "url": "https://github.com/nebuloss/megapet.git"
   },
   "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

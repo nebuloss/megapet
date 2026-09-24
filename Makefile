@@ -4,7 +4,18 @@ DIST        := dist
 WEBDIST     := internal/server/webdist
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS     := -s -w -X github.com/nebuloss/megapet/internal/server.Version=$(VERSION)
-GOFLAGS     := -trimpath
+
+# Reproducible builds: the same source and the same VERSION must produce the
+# same bytes, wherever they are built.
+#
+# `-trimpath` removes the build directory, which is the obvious one. The
+# subtle one is `-buildvcs=false`: Go otherwise stamps the commit, the commit
+# time and whether the tree was dirty into the binary, so a build from a git
+# checkout can never match one from an exported tarball — which is exactly the
+# difference between CI and a release built anywhere else. The identifying
+# information belongs in VERSION, which is already stamped and is visible with
+# `megapetd -version`.
+GOFLAGS     := -trimpath -buildvcs=false
 
 .PHONY: help all build backend web web-deps dev dev-api preview run dist-all \
         tidy fmt fmt-check vet test test-go test-web typecheck check verify clean

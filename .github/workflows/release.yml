@@ -32,7 +32,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Pinned by .nvmrc so CI and a developer's machine agree; the build
+          # is reproducible, and a floating major would be the one input able
+          # to break that silently.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 

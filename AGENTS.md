@@ -46,6 +46,7 @@ is produced on the build host. When local and remote disagree, remote wins.
 | `make dev-api` | `go run ./cmd/megapetd -log-level debug` on :8080. |
 | `make preview` | Standalone visuals playground, **no backend** → `web/preview-dist/index.html`. |
 | `make dist-all` | Cross-compiles 7 platforms with archives + checksums. |
+| `./scripts/verify-release.sh v1.2.0` | Rebuilds a published release and compares it byte for byte. |
 | `make help` | Lists the documented targets. |
 
 Narrower loops: `make test-go`, `make test-web`, `make typecheck`, `make vet`.
@@ -54,6 +55,23 @@ Single vitest file: `cd web && npx vitest run src/mech/gear.test.ts`.
 
 `MEGAPET_BACKEND` points the Vite proxy somewhere other than
 `http://127.0.0.1:8080`.
+
+### Reproducible builds
+
+The same source and the same `VERSION` produce the same bytes, wherever they
+are built, and CI asserts it on every push by building twice — once from the
+checkout, once from a copy with no `.git`.
+
+`GOFLAGS` carries `-buildvcs=false` for this. Go otherwise stamps the commit,
+the commit time and whether the tree was dirty into the binary, so a build
+from a git checkout can never match one from an exported tarball — which was
+exactly why a release built by CI differed from the same tag built by hand.
+The identifying information belongs in `VERSION`, which is stamped already and
+visible through `megapetd -version`.
+
+Node is pinned by `.nvmrc`, which both workflows read. The bundle turned out to
+be byte-identical across Node 20 and 24, but a floating major is the one input
+that could break this silently.
 
 ### The embed dance
 

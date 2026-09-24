@@ -23,7 +23,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Pinned by .nvmrc so CI and a developer's machine agree; the build
+          # is reproducible, and a floating major would be the one input able
+          # to break that silently.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -36,6 +39,31 @@ jobs:
 
       - name: Build
         run: make build
+
+      # The same source and the same VERSION must produce the same bytes, or
+      # nobody can check that a published binary came from the tag it claims.
+      # It is cheap to assert and easy to lose: a stray timestamp, an
+      # embedded path or a VCS stamp all break it silently.
+      - name: Build is reproducible
+        run: |
+          set -eu
+          sha256sum dist/megapetd | cut -d' ' -f1 > /tmp/first
+          # A second build from a copy without .git, which is how a release
+          # built from an exported tarball sees the tree. This is exactly the
+          # difference that used to make CI and local builds disagree.
+          rm -rf /tmp/copy && mkdir /tmp/copy
+          # `./dist`, not `dist`: tar matches the paths it emits, which are
+          # relative to the `.` it was given.
+          tar --exclude=.git --exclude=./dist -cf - . | tar -xf - -C /tmp/copy
+          make -C /tmp/copy build >/dev/null
+          sha256sum /tmp/copy/dist/megapetd | cut -d' ' -f1 > /tmp/second
+          if ! diff -q /tmp/first /tmp/second >/dev/null; then
+            echo "::error::build is not reproducible"
+            echo "with .git:    $(cat /tmp/first)"
+            echo "without .git: $(cat /tmp/second)"
+            exit 1
+          fi
+          echo "reproducible: $(cat /tmp/first)"
 
       - uses: actions/upload-artifact@v4
         with:
