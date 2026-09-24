@@ -242,8 +242,13 @@ export class Monitor {
 
   /** Position on the session timeline now, for a graph that scrolls smoothly. */
   get elapsedMs(): number {
-    if (this.running) return this.timeBase + (performance.now() - this.startedAt);
-    return this.series.last?.t ?? 0;
+    // Never behind the newest sample. `stop` records a final point before the
+    // session is marked stopped, so reading the clock alone could return a
+    // moment earlier than a sample already on the graph — which the drawing
+    // then has to reconcile, and cannot.
+    const last = this.series.last?.t ?? 0;
+    if (!this.running) return last;
+    return Math.max(last, this.timeBase + (performance.now() - this.startedAt));
   }
 
   /** Throws the history away, for starting a genuinely new session. */

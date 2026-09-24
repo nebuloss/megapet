@@ -638,11 +638,20 @@ export class MonitorPanel extends Component<HTMLElement> {
     if (live && this.viewport.isFocused) {
       this.edge.down.setTarget(this.live.down);
       this.edge.up.setTarget(this.live.up);
-      lead = {
-        t: nowMs,
-        down: this.edge.down.advance(dt),
-        up: this.edge.up.advance(dt),
-      };
+      // Never behind the last committed sample. The clock and the samples come
+      // from different places, so around a stop the provisional point can land
+      // *before* the final sample — which gives the spline a segment that runs
+      // backwards in time and makes it loop over itself.
+      const lastT = committed[committed.length - 1]?.t ?? 0;
+      if (nowMs > lastT) {
+        lead = {
+          t: nowMs,
+          down: this.edge.down.advance(dt),
+          up: this.edge.up.advance(dt),
+        };
+      } else {
+        nowMs = lastT;
+      }
     } else {
       this.edge.down.reset();
       this.edge.up.reset();

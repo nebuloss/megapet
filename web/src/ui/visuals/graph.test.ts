@@ -143,6 +143,38 @@ describe('graph geometry', () => {
   });
 });
 
+/**
+ * A line is a function of time, so it only ever moves rightwards.
+ *
+ * Around a stop the provisional "now" point and the last recorded sample come
+ * from different clocks, and a point that lands behind its predecessor gives
+ * the spline a segment running backwards — which draws as a loop doubling
+ * over the trace.
+ */
+describe('the drawn line never runs backwards', () => {
+  const xs = (path: string): number[] =>
+    [...path.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[1]));
+
+  it('advances across a well-ordered series', () => {
+    const drawn = xs(linePath(points(10, 20, 30, 40), 'down', VIEW));
+    for (let i = 1; i < drawn.length; i++) {
+      expect(drawn[i]!).toBeGreaterThanOrEqual(drawn[i - 1]! - 0.01);
+    }
+  });
+
+  it('does not double back when a point shares its predecessor\u2019s time', () => {
+    const repeated = [
+      { t: 0, down: 10, up: 0 },
+      { t: 1000, down: 20, up: 0 },
+      { t: 1000, down: 30, up: 0 },
+    ];
+    const drawn = xs(linePath(repeated, 'down', VIEW));
+    for (let i = 1; i < drawn.length; i++) {
+      expect(drawn[i]!).toBeGreaterThanOrEqual(drawn[i - 1]! - 0.01);
+    }
+  });
+});
+
 describe('the time axis', () => {
   const view = { width: 600, height: 200, fromMs: 0, toMs: 30_000 };
 

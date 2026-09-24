@@ -206,6 +206,12 @@ Non-obvious frontend invariants:
   drawn as a provisional point at "now" (`ui/visuals/leading-edge.ts`), for
   *whichever* test is running. Drawn only from committed samples the line grows
   in once-a-second jumps, which is the staircase this removes.
+- **The leading point is never behind the newest sample.** Its time comes from
+  a clock and the samples come from the engine, so around a stop the
+  provisional point can land *before* the final sample — which gives the
+  spline a segment running backwards in time, drawn as a loop doubling over
+  the trace. `Monitor.elapsedMs` clamps to the newest sample and `draw` drops
+  the lead point rather than emitting one behind it.
 - **The leading edge must chase the *live* reading, not the last recorded
   sample.** Feeding it the last sample draws a flat stub out to the edge and
   then steps when the next sample lands, which is the opposite of the point.
