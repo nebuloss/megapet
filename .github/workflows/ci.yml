@@ -47,23 +47,33 @@ jobs:
       - name: Build is reproducible
         run: |
           set -eu
-          sha256sum dist/megapetd | cut -d' ' -f1 > /tmp/first
-          # A second build from a copy without .git, which is how a release
-          # built from an exported tarball sees the tree. This is exactly the
-          # difference that used to make CI and local builds disagree.
-          rm -rf /tmp/copy && mkdir /tmp/copy
+          # Both builds are given the same explicit VERSION. Left implicit it
+          # is derived from `git describe`, so the two trees below would ask
+          # for different versions, and VERSION is stamped into the binary:
+          # the comparison would fail for a reason that is not a bug.
+          V=reproducibility-check
           # `./dist`, not `dist`: tar matches the paths it emits, which are
-          # relative to the `.` it was given.
-          tar --exclude=.git --exclude=./dist -cf - . | tar -xf - -C /tmp/copy
-          make -C /tmp/copy build >/dev/null
-          sha256sum /tmp/copy/dist/megapetd | cut -d' ' -f1 > /tmp/second
-          if ! diff -q /tmp/first /tmp/second >/dev/null; then
+          # relative to the `.` it was given. dist/ is excluded so neither
+          # copy starts from the other's output, and the real build artifact
+          # uploaded below is left alone.
+          rm -rf /tmp/withgit /tmp/nogit
+          mkdir /tmp/withgit /tmp/nogit
+          tar --exclude=./dist -cf - . | tar -xf - -C /tmp/withgit
+          # The second tree has no .git, which is how a release built from an
+          # exported tarball sees the source. That difference is exactly what
+          # used to make CI and a hand-built binary disagree.
+          tar --exclude=./dist --exclude=./.git -cf - . | tar -xf - -C /tmp/nogit
+          make -C /tmp/withgit build VERSION="$V" >/dev/null
+          make -C /tmp/nogit build VERSION="$V" >/dev/null
+          first="$(sha256sum /tmp/withgit/dist/megapetd | cut -d' ' -f1)"
+          second="$(sha256sum /tmp/nogit/dist/megapetd | cut -d' ' -f1)"
+          if [ "$first" != "$second" ]; then
             echo "::error::build is not reproducible"
-            echo "with .git:    $(cat /tmp/first)"
-            echo "without .git: $(cat /tmp/second)"
+            echo "with .git:    $first"
+            echo "without .git: $second"
             exit 1
           fi
-          echo "reproducible: $(cat /tmp/first)"
+          echo "reproducible: $first"
 
       - uses: actions/upload-artifact@v4
         with:
