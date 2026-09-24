@@ -7,6 +7,24 @@ versions follow [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+### Changed
+
+- **Builds are reproducible.** The same source and the same version now
+  produce the same bytes wherever they are built, so a published binary can
+  be checked against the tag it claims to come from. Go was stamping the
+  commit and build time into every binary, which meant a release built by CI
+  from a git checkout could never match one built from an exported tarball.
+  CI asserts the property on every push.
+- Node is pinned by `.nvmrc` rather than floating on a major version.
+
+### Added
+
+- `scripts/verify-release.sh <tag>`: rebuilds a published release from the
+  current tree and compares it byte for byte. A checksum only tells you the
+  download was not corrupted; this tells you what the binary was built from.
+  Releases from 1.2.1 onwards can be verified this way — 1.2.0 predates the
+  change and will not match.
+
 ## 1.2.0 — 2026-09-24
 
 Results are now measured by the server rather than reported by the browser.
