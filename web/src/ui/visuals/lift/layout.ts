@@ -106,10 +106,21 @@ export const LEVER = {
  * The extent Nookies occupies in his own coordinates — ear tips to feet,
  * including the arms. Measured from the drawing in `nookie.ts`; if that
  * changes shape, change this and nothing else.
+ *
+ * Kept symmetric although he is not: his raised arm reaches further than his
+ * hanging one, and boxing him tightly would centre the window on that arm,
+ * putting his body visibly off to one side of the glass.
  */
-export const NOOKIE_BOUNDS: Bounds = { minX: -26, minY: -27, maxX: 26, maxY: 24 };
+export const NOOKIE_BOUNDS: Bounds = { minX: -29, minY: -29, maxX: 29, maxY: 31.5 };
 
-/** The window he rides behind, derived from the car rather than restated. */
+/**
+ * The window he rides behind, derived from the car rather than restated.
+ *
+ * The glass is his and nothing else's. He is fitted to it with barely a unit
+ * of padding, so anything else drawn inside these bounds — a ceiling lamp was
+ * the last one — ends up buried in his head rather than decorating the car.
+ * Car furniture goes outside the window.
+ */
 export const CAR_WINDOW: Rect = {
   x: CAR.x - CAR.w / 2 + 7,
   y: 11,

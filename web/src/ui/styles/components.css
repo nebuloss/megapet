@@ -727,17 +727,26 @@
 
 /* --------------------------------------------------------- lift & Nookies */
 
-/* The mascot's fur stays beige across both themes; only the scarf follows the
-   Material You seed, so Nookies stays recognisably Nookies. */
+/* Nookies takes nothing from the palette: he is cream in both themes, so he
+   stays recognisably himself while the machine around him follows the seed.
+   These live on `:root` rather than on `.lift` because he appears on more than
+   one screen — scoped to the lift, he rendered as an unpainted silhouette the
+   moment he stepped onto the monitor. */
+:root {
+  /* Sampled off a photograph of the real plush: a soft butter cream. An
+     earlier pass guessed a greyed taupe, which is what the velour photographs
+     as in shadow, not what the bear is. The embroidery is a light brown too —
+     near-black features turn him into a cartoon bear rather than a stitched
+     one. */
+  --nookie-fur: #e3cf9f;
+  --nookie-fur-dark: #c0a771;
+  --nookie-fur-soft: #f0e4bf;
+  --nookie-muzzle: #ecdfb4;
+  --nookie-ink: #8d6840;
+  --nookie-bob: 2.6s;
+}
+
 .lift {
-  /* Sampled from the real Noukie's bear: a greyed taupe, not a golden teddy.
-     The old beige was too yellow, which read as a generic bear rather than
-     this one. */
-  --nookie-fur: #c9b298;
-  --nookie-fur-dark: #a08a70;
-  --nookie-fur-soft: #ddcdb6;
-  --nookie-muzzle: #ece0cc;
-  --nookie-ink: #4a382a;
   --lift-accent: var(--md-sys-color-primary);
   --lift-effort: 0;
   --nookie-bob: 2.6s;
@@ -1076,13 +1085,6 @@
   fill: color-mix(in srgb, var(--lift-accent) 14%, var(--md-sys-color-surface-container-lowest));
 }
 
-.lift__car-lamp {
-  stroke: var(--lift-accent);
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  opacity: 0.75;
-}
-
 /* --- motion streaks: only while a test is actually running --- */
 
 .lift__streak {
@@ -1126,26 +1128,40 @@
   stroke-width: 1.1;
 }
 
-.nookie__ear-inner,
-.nookie__belly {
+.nookie__ear-inner {
   fill: var(--nookie-fur-soft);
 }
 
+/* The snout is a soft rise in the same velour, so it gets no outline. Drawn
+   with one, its lower edge runs parallel to the smile and the two read as a
+   closed shape — a muzzle in a bucket rather than a face. */
 .nookie__muzzle {
   fill: var(--nookie-muzzle);
-  stroke: color-mix(in srgb, var(--nookie-fur-dark) 55%, transparent);
-  stroke-width: 0.7;
+}
+
+/* The belly panel is a seam, not a bib: barely lighter than the fur. The pads
+   and ear centres keep the full contrast, which is why this is not simply
+   `--nookie-fur-soft`. */
+.nookie__belly {
+  fill: color-mix(in srgb, var(--nookie-fur-soft) 55%, var(--nookie-fur));
 }
 
 .nookie__nose {
   fill: var(--nookie-ink);
 }
 
-.nookie__mouth {
+.nookie__mouth,
+.nookie__brows {
   fill: none;
   stroke: var(--nookie-ink);
   stroke-width: 1.1;
   stroke-linecap: round;
+}
+
+/* The brows are the plush's most recognisable stitch. They sit high and read
+   as mildly surprised, which is most of why he looks friendly. */
+.nookie__brows {
+  stroke-width: 1;
 }
 
 .nookie__eyes ellipse {
@@ -1155,15 +1171,12 @@
   animation: nookie-blink 5.5s ease-in-out infinite;
 }
 
-.nookie__scarf,
-.nookie__scarf-tail {
-  fill: var(--lift-accent);
-}
+
 
 .nookie__arm path {
   fill: none;
   stroke: var(--nookie-fur);
-  stroke-width: 6.5;
+  stroke-width: 7;
   stroke-linecap: round;
 }
 
@@ -1181,6 +1194,19 @@
 
 .nookie__arm--back .nookie__paw {
   fill: color-mix(in srgb, var(--nookie-fur-soft) 84%, var(--nookie-fur-dark));
+}
+
+/* He has feet, not legs: the plush is a sitting bear whose soles come straight
+   off the bottom of the body, so anything drawn between the two is a joint he
+   does not have. */
+.nookie__foot {
+  fill: var(--nookie-fur);
+  stroke: var(--nookie-fur-dark);
+  stroke-width: 1.1;
+}
+
+.nookie__foot-pad {
+  fill: var(--nookie-fur-soft);
 }
 
 /* The wave is the one gesture that speeds up with the connection. */
@@ -1250,6 +1276,666 @@
   width: 100%;
 }
 
+/* ------------------------------------------------- continuous monitor */
+
+/* ---------------------------------------------------------- mode switch */
+
+.modes {
+  width: min(48rem, 100%);
+  margin: 0 auto 1rem;
+  padding: 0 var(--page-gutter);
+}
+
+.modes__tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.modes[hidden] {
+  display: none;
+}
+
+.modes__tab {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--md-sys-shape-corner-l);
+  border: 1px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  text-align: left;
+}
+
+.modes__tab[data-selected='true'] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-color: transparent;
+}
+
+.modes__icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.modes__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.modes__text {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.modes__label {
+  font: var(--md-sys-typescale-label-large);
+}
+
+/* The hint is what makes two one-word tabs mean something. It is the first
+   thing to go when the screen is narrow, because by then you have used them. */
+.modes__hint {
+  font: var(--md-sys-typescale-label-small);
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A running mode keeps a dot, so leaving one going and looking at the other is
+   safe: the tab bar always says what the link is doing. */
+.modes__live {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  opacity: 0;
+}
+
+.modes__tab[data-live='true'] .modes__live {
+  opacity: 1;
+  animation: modes-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes modes-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modes__tab[data-live='true'] .modes__live {
+    animation: none;
+  }
+}
+
+@media (max-width: 30rem) {
+  .modes__hint {
+    display: none;
+  }
+}
+
+/* In the hero the panel is the mode itself, not a card inside one: the hero
+   already provides the surface, so a second background inside it reads as a
+   box within a box. */
+.monitor[data-compact='true'] .monitor__chart {
+  height: clamp(14rem, 42dvh, 24rem);
+}
+
+.monitor[data-compact='true'][data-graph='true'] .monitor__rider {
+  width: 10rem;
+  height: 7rem;
+}
+
+.monitor[data-compact='true'] {
+  background: transparent;
+  padding: 0;
+  width: 100%;
+  justify-items: center;
+  gap: 1.25rem;
+}
+
+/* Stacked and centred here, where the panel is the width of the hero rather
+   than of the page. */
+.monitor[data-compact='true'] .monitor__head {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* He is the mode's mascot, so in the hero he gets the room the dial had
+   instead of being tucked into a corner of the heading. */
+.monitor[data-compact='true'] .monitor__rider {
+  order: -1;
+  margin: 0;
+  width: 13rem;
+  height: 9.5rem;
+}
+
+.monitor[data-compact='true'] .monitor__directions,
+.monitor[data-compact='true'] .monitor__controls,
+.monitor[data-compact='true'] .monitor__actions {
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-right: 0;
+}
+
+.monitor[data-compact='true'] .monitor__span {
+  display: none;
+}
+
+/* Manual mode stands where the dial did, so the hero keeps roughly its height
+   rather than collapsing to the height of three buttons and making the whole
+   page jump every time the mode changes. */
+.hero[data-mode='manual'] {
+  justify-content: center;
+  align-content: center;
+  min-height: clamp(22rem, 52dvh, 34rem);
+}
+
+.monitor {
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-sys-shape-corner-xl);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  scroll-margin-top: 4.5rem;
+}
+
+.monitor__blurb {
+  font: var(--md-sys-typescale-body-small);
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+  max-width: 48ch;
+}
+
+/* The section head stacks here: the blurb is a paragraph, not a trailing
+   control, so the row layout the other sections use would strand it. */
+.monitor .section__head {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0;
+}
+
+.monitor__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ---- Nookies on his treadmill ---- */
+
+.monitor__rider {
+  width: 9rem;
+  height: 7rem;
+  flex: none;
+  margin-left: auto;
+  overflow: visible;
+}
+
+.jog__belt-band {
+  fill: var(--md-sys-color-surface-container-highest);
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.2;
+}
+
+.jog__tread {
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.jog__roller-body {
+  fill: var(--md-sys-color-surface-container);
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.2;
+}
+
+.jog__roller-spoke {
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+/* The effort shows in the belt rather than in him: the faster the link, the
+   more the treadmill reads as moving. */
+.jog[data-pace='brisk'] .jog__tread {
+  opacity: 0.75;
+}
+
+.jog[data-pace='fast'] .jog__tread {
+  opacity: 1;
+  stroke: var(--md-sys-color-primary);
+}
+
+/* `--jog-bob` is set from the live reading, so his stride and the belt agree.
+   At rest there is no period and the animation is switched off entirely. */
+.jog__rider {
+  animation: jog-bob var(--jog-bob, 0ms) ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.jog[data-running='false'] .jog__rider {
+  animation: none;
+}
+
+@keyframes jog-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -2.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jog__rider {
+    animation: none;
+  }
+}
+
+.monitor__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.monitor__directions {
+  display: flex;
+  gap: 0.5rem;
+  margin-right: auto;
+}
+
+/* Real switches rather than chips that merely change colour: either, neither
+   -but-one, or both may be on, and a chip's selected state can only be judged
+   by comparing it against its neighbour. Each carries the colour of the line
+   it turns on, so it is the legend as well as the control. */
+.monitor__direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem 0.55rem 0.6rem;
+  border-radius: var(--md-sys-shape-corner-l);
+  border: 1px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  text-align: left;
+}
+
+.monitor__switch {
+  position: relative;
+  width: 2.1rem;
+  height: 1.25rem;
+  flex: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+  border: 1px solid var(--md-sys-color-outline);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.monitor__thumb {
+  position: absolute;
+  top: 50%;
+  left: 0.15rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+  transform: translateY(-50%);
+  transition: transform 120ms ease, background 120ms ease, width 120ms ease;
+}
+
+.monitor__direction[data-on='true'] .monitor__thumb {
+  /* Travels the width of the track less its own width and both insets. */
+  transform: translate(0.85rem, -50%);
+  background: var(--md-sys-color-on-primary);
+}
+
+.monitor__direction--down[data-on='true'] .monitor__switch {
+  background: var(--md-sys-color-primary);
+  border-color: transparent;
+}
+
+.monitor__direction--up[data-on='true'] .monitor__switch {
+  background: var(--md-sys-color-tertiary);
+  border-color: transparent;
+}
+
+.monitor__direction--up[data-on='true'] .monitor__thumb {
+  background: var(--md-sys-color-on-tertiary);
+}
+
+.monitor__direction[data-on='true'] {
+  border-color: transparent;
+}
+
+.monitor__direction--down[data-on='true'] {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 12%, var(--md-sys-color-surface-container));
+}
+
+.monitor__direction--up[data-on='true'] {
+  background: color-mix(in srgb, var(--md-sys-color-tertiary) 12%, var(--md-sys-color-surface-container));
+}
+
+.monitor__direction-text {
+  display: grid;
+  gap: 0.05rem;
+}
+
+.monitor__direction-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: var(--md-sys-typescale-label-large);
+}
+
+.monitor__direction-label svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* The state in words, so it does not rest on seeing where a small thumb sits.
+   It also says "Measuring" rather than "On" while a session runs, which is
+   the difference between a setting and something happening. */
+.monitor__direction-state {
+  font: var(--md-sys-typescale-label-small);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.monitor__direction[data-on='false'] .monitor__direction-label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.monitor__plot {
+  position: relative;
+}
+
+.monitor__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--md-sys-shape-corner-l);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-body-small);
+}
+
+.monitor__warning[hidden] {
+  display: none;
+}
+
+.monitor__warning svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  margin-top: 0.1rem;
+}
+
+.monitor__chart {
+  width: 100%;
+  /* Fixed height, not an aspect ratio: the graph is read by height, and a wide
+     screen should give it more time on screen rather than a taller box. */
+  height: 14rem;
+  display: block;
+  background: var(--md-sys-color-surface-container-lowest);
+  border-radius: var(--md-sys-shape-corner-l);
+  /* Draggable, so it says so and does not select text while you drag. */
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.monitor__chart[data-dragging='true'] {
+  cursor: grabbing;
+}
+
+.monitor__chart:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+/* Given the whole page the graph can afford to be read at a glance. */
+.monitor[data-compact='true'][data-graph='true'] .monitor__chart {
+  height: clamp(16rem, 46dvh, 26rem);
+}
+
+.monitor__view {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.monitor__zoom svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* The same switch as the direction toggles, because it is the same kind of
+   thing: an on/off state you can read without pressing it. */
+.monitor__focus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem 0.4rem 0.5rem;
+  border-radius: var(--md-sys-shape-corner-full);
+  border: 1px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-medium);
+  cursor: pointer;
+}
+
+.monitor__focus[data-on='true'] {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 12%, var(--md-sys-color-surface-container));
+  color: var(--md-sys-color-on-surface);
+  border-color: transparent;
+}
+
+.monitor__focus .monitor__switch {
+  width: 1.7rem;
+  height: 1rem;
+}
+
+.monitor__focus .monitor__thumb {
+  width: 0.65rem;
+  height: 0.65rem;
+  left: 0.12rem;
+}
+
+.monitor__focus[data-on='true'] .monitor__switch {
+  background: var(--md-sys-color-primary);
+  border-color: transparent;
+}
+
+.monitor__focus[data-on='true'] .monitor__thumb {
+  transform: translate(0.68rem, -50%);
+  background: var(--md-sys-color-on-primary);
+}
+
+/* The live reading, ruled across the scale it belongs to. Dashed, so it is
+   plainly an annotation rather than another trace. */
+.monitor__marker {
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+}
+
+.monitor__marker--down {
+  stroke: var(--md-sys-color-primary);
+}
+
+.monitor__marker--up {
+  stroke: var(--md-sys-color-tertiary);
+}
+
+.monitor__marker-label {
+  font-size: 11px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--md-sys-color-surface-container-lowest);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.monitor__marker-label--down {
+  fill: var(--md-sys-color-primary);
+}
+
+.monitor__marker-label--up {
+  fill: var(--md-sys-color-tertiary);
+}
+
+.monitor__axis-rule {
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 4;
+  opacity: 0.35;
+}
+
+.monitor__axis-label {
+  fill: var(--md-sys-color-on-surface-variant);
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.monitor__grid-line {
+  stroke: var(--md-sys-color-outline);
+  stroke-width: 0.5;
+  opacity: 0.45;
+}
+
+.monitor__grid-label {
+  fill: var(--md-sys-color-on-surface-variant);
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* `preserveAspectRatio: none` stretches the viewBox, which would stretch the
+   stroke with it. Vector-effect keeps the line one width at any scale. */
+.monitor__line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.monitor__line--down {
+  stroke: var(--md-sys-color-primary);
+}
+
+.monitor__line--up {
+  stroke: var(--md-sys-color-tertiary);
+}
+
+.monitor__area {
+  stroke: none;
+}
+
+.monitor__area--down {
+  fill: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+}
+
+.monitor__area--up {
+  fill: color-mix(in srgb, var(--md-sys-color-tertiary) 12%, transparent);
+}
+
+.monitor__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  pointer-events: none;
+  font: var(--md-sys-typescale-body-small);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* `display` here would otherwise beat the `hidden` attribute, which is how
+   this note stayed on screen over a graph that was already drawing. */
+.monitor__empty[hidden] {
+  display: none;
+}
+
+/* Averages, elapsed and total belong to a manual session. While the speed test
+   is the thing on the graph they are not its figures, so they are dimmed
+   rather than left looking like data that failed to arrive. */
+.monitor[data-foreign='true'] .monitor__readout[data-key^='avg'],
+.monitor[data-foreign='true'] .monitor__readout[data-key='moved'] {
+  opacity: 0.35;
+}
+
+/* A one-way session should not show two dashes for the direction it is not
+   measuring, so the unused readouts are dimmed rather than removed — removing
+   them would reflow the grid every time the mode changed. */
+.monitor[data-down='false'] .monitor__readout[data-key$='down'],
+.monitor[data-up='false'] .monitor__readout[data-key$='up'] {
+  opacity: 0.35;
+}
+
+.monitor__readouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.monitor__readout {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--md-sys-shape-corner-l);
+  background: var(--md-sys-color-surface-container);
+}
+
+.monitor__label {
+  font: var(--md-sys-typescale-label-small);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.monitor__figure {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.monitor__value {
+  font: var(--md-sys-typescale-title-medium);
+}
+
+.monitor__unit {
+  font: var(--md-sys-typescale-label-small);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.monitor__actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.monitor__span {
+  font: var(--md-sys-typescale-label-small);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
 /* ------------------------------------------------------------------ phone */
 
 /*
@@ -1304,3 +1990,52 @@
     gap: 0.35rem;
   }
 }
+
+/* ------------------------------------------------------------ modal ask */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 55%, transparent);
+}
+
+.dialog {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-radius: var(--md-sys-shape-corner-xl);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 35%);
+}
+
+.dialog__title {
+  font: var(--md-sys-typescale-title-medium);
+  margin: 0;
+}
+
+.dialog__body {
+  font: var(--md-sys-typescale-body-medium);
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 0;
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Stopping a running test is the destructive branch, and should not look like
+   the safe default. */
+.btn--danger {
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+}
+

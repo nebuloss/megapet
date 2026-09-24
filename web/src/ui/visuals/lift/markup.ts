@@ -159,7 +159,6 @@ export function liftMarkup(clipId: string): string {
     <rect class="lift__car-roof" x="${CAR.x - CAR.w / 2 - 3}" y="0" width="${CAR.w + 6}" height="6" rx="3"/>
     <rect class="lift__car-body" x="${CAR.x - CAR.w / 2}" y="5" width="${CAR.w}" height="${CAR.h - 5}" rx="8"/>
     <rect class="lift__car-window" x="${CAR_WINDOW.x}" y="${CAR_WINDOW.y}" width="${CAR_WINDOW.width}" height="${CAR_WINDOW.height}" rx="6"/>
-    <path class="lift__car-lamp" d="M${CAR.x - 4} 13h8"/>
     <path class="lift__bracket" d="M${CAR.x - CAR.w / 2} 14H${ROPE_RUN_X.toFixed(1)}"/>
     <circle class="lift__lever-mount" cx="${LEVER.x}" cy="${LEVER.y}" r="2.6"/>
     <g class="lift__lever" transform="rotate(${LEVER.seatUp.toFixed(2)} ${LEVER.x} ${LEVER.y})">
