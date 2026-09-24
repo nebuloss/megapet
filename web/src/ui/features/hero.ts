@@ -22,6 +22,8 @@ export class Hero extends Component<HTMLElement> {
   private kind: VisualKind;
   private mounted: SpeedVisual;
   private running = false;
+  private blocked: 'manual' | null = null;
+  private actions!: HTMLElement;
 
   constructor(
     private readonly preferences: Preferences,
@@ -40,8 +42,26 @@ export class Hero extends Component<HTMLElement> {
     this.startButton.addEventListener('click', () => (this.running ? this.onStop() : this.onStart()));
     this.setRunning(false);
 
-    this.root.append(this.slot, el('div', { class: 'hero__actions' }, this.startButton), this.chips);
+    this.actions = el('div', { class: 'hero__actions' }, this.startButton);
+    this.root.append(this.slot, this.actions, this.chips);
     hydrateRipples(this.root);
+  }
+
+  /**
+   * Puts manual mode's controls where the speed dial usually is.
+   *
+   * The two modes are alternatives, so they take the same place rather than
+   * stacking: in manual mode the dial and its start button step aside for the
+   * switches, and the mascot goes with them — manual mode brings its own.
+   * Passing null restores auto mode.
+   */
+  setManual(controls: HTMLElement | null): void {
+    this.root.dataset.mode = controls ? 'manual' : 'auto';
+    if (controls) {
+      this.root.replaceChildren(controls, this.chips);
+    } else {
+      this.root.replaceChildren(this.slot, this.actions, this.chips);
+    }
   }
 
   /** The visual currently mounted. Valid until the next `setVisual`. */
@@ -64,8 +84,34 @@ export class Hero extends Component<HTMLElement> {
   /** Switches the primary button between Start and Stop. */
   setRunning(running: boolean): void {
     this.running = running;
-    this.startButton.innerHTML = icon(running ? 'stop' : 'speed');
-    this.startButton.append(document.createTextNode(running ? 'Stop' : 'Start test'));
+    this.paintStart();
+  }
+
+  /**
+   * Blocks starting a run while manual mode is using the link.
+   *
+   * The two tests share one connection, so running both would have each
+   * measuring a link the other is already saturating. Saying so on the button
+   * is better than a dialog: it is visible before the click rather than after
+   * it, and it costs nobody a decision.
+   */
+  setBlocked(reason: 'manual' | null): void {
+    this.blocked = reason;
+    this.paintStart();
+  }
+
+  private paintStart(): void {
+    const blocked = this.blocked !== null && !this.running;
+    this.startButton.disabled = blocked;
+    this.startButton.innerHTML = icon(this.running ? 'stop' : 'speed');
+    this.startButton.append(
+      document.createTextNode(
+        this.running ? 'Stop' : blocked ? 'Manual mode running' : 'Start test',
+      ),
+    );
+    this.startButton.title = blocked
+      ? 'Stop manual mode first — both would be measuring the same link.'
+      : '';
   }
 
   setConnection(info: IpInfo | null, peer: Peer | null): void {

@@ -10,14 +10,34 @@ export interface TransferResult {
   readonly totalBytes: number;
 }
 
+/** What a phase reports to its caller on every tick. */
+export interface TransferTick {
+  /** Throughput over a short trailing window: what a gauge should show. */
+  readonly liveMbps: number;
+  /** Throughput over the whole post-grace window so far. */
+  readonly averageMbps: number;
+  /** Bytes moved, ramp-up included. */
+  readonly bytes: number;
+  /** 0..1 of the scheduled window, and always 0 for an endless phase. */
+  readonly progress: number;
+}
+
 export interface TransferOptions {
   readonly base: string;
   readonly streams: number;
+  /**
+   * How long to measure for.
+   *
+   * `Infinity` means the phase has no scheduled end and runs until the caller
+   * aborts it, which is what the continuous monitor wants. Everything else
+   * about the phase is unchanged by that: the grace period still applies, and
+   * the figures still exclude it.
+   */
   readonly durationMs: number;
   readonly graceMs: number;
   readonly overhead: number;
   readonly signal: AbortSignal;
-  readonly onTick: (liveMbps: number, progress: number) => void;
+  readonly onTick: (tick: TransferTick) => void;
 }
 
 /** How often the meter is sampled and the gauge updated. */
@@ -88,7 +108,14 @@ export abstract class TransferPhase {
         controller.abort();
         return;
       }
-      onTick(meter.live() * overhead, Math.min(1, elapsed / durationMs));
+      onTick({
+        liveMbps: meter.live() * overhead,
+        averageMbps: meter.final(now) * overhead,
+        bytes: meter.bytes,
+        // An endless phase has no window to be a fraction of, so this stays at
+        // zero rather than creeping towards a finish that never arrives.
+        progress: Number.isFinite(durationMs) ? Math.min(1, elapsed / durationMs) : 0,
+      });
     }, TICK_MS);
 
     try {
@@ -109,7 +136,11 @@ export abstract class TransferPhase {
       signal.removeEventListener('abort', abort);
     }
 
-    if (signal.aborted && !captured) throw new DOMException(`${this.name} aborted`, 'AbortError');
+    // Being aborted is a failure for a phase that had a window to finish, and
+    // the normal ending for one that never had an end of its own.
+    if (signal.aborted && !captured && Number.isFinite(this.options.durationMs)) {
+      throw new DOMException(`${this.name} aborted`, 'AbortError');
+    }
     capture(performance.now());
     return captured!;
   }

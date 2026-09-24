@@ -12,6 +12,8 @@ export interface TopBarHandlers {
   readonly peers: () => readonly Peer[];
   readonly onPeerChange: (peer: Peer | null) => void;
   readonly onVisualChange: (kind: VisualKind) => void;
+  /** Opens the graph, which both modes record into. */
+  readonly onGraph: () => void;
   /** Reads the current selections, so menus reflect live state when opened. */
   readonly currentPeer: () => Peer | null;
   readonly currentVisual: () => VisualKind;
@@ -26,6 +28,7 @@ const MODES: readonly [ThemeMode, string, IconName][] = [
 /** The application bar: brand, server picker, quick theme toggle, settings. */
 export class TopBar extends Component<HTMLElement> {
   private readonly themeToggle: HTMLButtonElement;
+  private graphButton: HTMLButtonElement | null = null;
   private readonly menus: MenuButton[] = [];
   private readonly onScroll = (): void => {
     this.root.dataset.scrolled = String(window.scrollY > 4);
@@ -39,7 +42,7 @@ export class TopBar extends Component<HTMLElement> {
     super(el('header', { class: 'top-bar', 'data-scrolled': 'false' }));
 
     this.themeToggle = this.buildThemeToggle();
-    const actions: HTMLElement[] = [];
+    const actions: HTMLElement[] = [this.buildGraphButton()];
     if (handlers.peers().length > 0) actions.push(this.buildServerMenu().root);
     actions.push(this.themeToggle, this.buildSettingsMenu().root);
 
@@ -68,6 +71,33 @@ export class TopBar extends Component<HTMLElement> {
       this.handlers.onHome();
     });
     return brand;
+  }
+
+  /**
+   * The graph, which belongs to neither mode and to both.
+   *
+   * It lives up here rather than beside the mode tabs because it is not a
+   * choice of mode — it is the record of what every mode has measured, so it
+   * should be reachable from anywhere in the app, the graph page included.
+   */
+  private buildGraphButton(): HTMLButtonElement {
+    const button = el('button', {
+      class: 'icon-button',
+      type: 'button',
+      'aria-pressed': 'false',
+      title: 'Graph',
+      'aria-label': 'Show the graph of everything measured so far',
+      html: icon('jitter'),
+    }) as HTMLButtonElement;
+    button.addEventListener('click', () => this.handlers.onGraph());
+    this.graphButton = button;
+    return button;
+  }
+
+  /** Marks the graph as the thing currently on screen. */
+  setGraphActive(active: boolean): void {
+    this.graphButton?.setAttribute('aria-pressed', String(active));
+    if (this.graphButton) this.graphButton.dataset.active = String(active);
   }
 
   /** One tap between light and dark; the full three-way choice is in settings. */

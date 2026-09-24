@@ -6,3 +6,5 @@ export * from './result-view';
 export * from './share-panel';
 export * from './test-controller';
 export * from './direct-endpoint';
+export * from './monitor-panel';
+export * from './mode-tabs';

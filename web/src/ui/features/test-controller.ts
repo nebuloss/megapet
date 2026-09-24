@@ -1,6 +1,20 @@
 import type { ApiClient, Submission } from '../../api';
 import type { Peer, StoredResult, TestParams } from '../../domain/types';
 import { SpeedTest, type Phase, type Snapshot } from '../../engine/runner';
+import { TimeSeries } from '../../engine/series';
+import type { Directions } from '../../engine/monitor';
+
+/** How often a run is sampled for the graph. */
+const SAMPLE_MS = 250;
+
+/** Running, but between phases: nothing is loading the link this instant. */
+const NOTHING: Directions = { down: false, up: false };
+
+/** What each phase is doing to the link, for the manual mode's switches. */
+const LOADS: Partial<Record<Phase, Directions>> = {
+  download: { down: true, up: false },
+  upload: { down: false, up: true },
+};
 import { describePlatform, formatMs, formatRate } from '../primitives/format';
 import type { IconName } from '../primitives/icons';
 import type { Drive, GaugeAccent, SpeedVisual } from '../visuals';
@@ -64,6 +78,28 @@ export interface TestControllerDeps {
   /** User-visible transient message. */
   readonly notify: (message: string) => void;
   readonly onSaved: (result: StoredResult) => void;
+  /**
+   * Reports what the run is loading the link with right now, or null when it
+   * is not running.
+   *
+   * Richer than a boolean because the manual mode's switches show it: while a
+   * staged run is in its upload phase the upload switch should read as on,
+   * because it is — the link really is being driven that way, just by the
+   * other test. Saying only "something is running" would leave both switches
+   * showing the visitor's own stale setting.
+   */
+  readonly onActivity: (directions: Directions | null) => void;
+  /** Fires as each point is recorded, so a visible graph can follow along. */
+  readonly onSample: () => void;
+  /**
+   * The reading right now, on every snapshot rather than every sample.
+   *
+   * A graph drawing this run needs the live figure, not the last one it
+   * recorded: chasing the recorded sample draws a flat stub out to the
+   * leading edge and then steps when the next sample lands, which is the
+   * opposite of what the leading edge is for.
+   */
+  readonly onLive: (down: number, up: number) => void;
 }
 
 /**
@@ -76,11 +112,30 @@ export interface TestControllerDeps {
  */
 export class TestController {
   private test: SpeedTest | null = null;
+  /**
+   * Every run so far, sampled as it happens, on one timeline.
+   *
+   * A staged run has always known its throughput second by second; it simply
+   * had nowhere to show it. Runs **accumulate** rather than replacing each
+   * other, so a morning's worth of spot checks can be read as a single graph
+   * with each run's download and upload standing up in turn — which is the
+   * question "is it slow right now, or has it been slow all week" asked in
+   * the only form that can answer it.
+   */
+  private readonly recording = new TimeSeries(600, 250);
+  private recordedAt = 0;
+  private recordedPhase: Phase = 'idle';
+  private timeline = 0;
 
   constructor(private readonly deps: TestControllerDeps) {}
 
   get isRunning(): boolean {
     return this.test !== null;
+  }
+
+  /** The last staged run as a graph, or null if nothing has been measured. */
+  get lastRun(): TimeSeries | null {
+    return this.recording.all.length > 0 ? this.recording : null;
   }
 
   abort(): void {
@@ -94,7 +149,9 @@ export class TestController {
     const { stats, visual, setRunning } = this.deps;
     const target = visual();
 
+    this.deps.onActivity(NOTHING);
     stats.reset();
+    this.beginRecording();
     target.reset();
     target.setActive(true);
     setRunning(true);
@@ -114,11 +171,14 @@ export class TestController {
       if (s.phase !== lastPhase) {
         lastPhase = s.phase;
         this.applyPhase(s, target);
+        this.deps.onActivity(LOADS[s.phase] ?? NOTHING);
       }
       this.applySnapshot(s, target);
     });
 
     this.test = null;
+    this.endRecording();
+    this.deps.onActivity(null);
     target.setActive(false);
     setRunning(false);
     stats.setActive(null);
@@ -184,6 +244,11 @@ export class TestController {
   }
 
   private applySnapshot(snapshot: Snapshot, visual: SpeedVisual): void {
+    this.record(snapshot);
+    this.deps.onLive(
+      snapshot.phase === 'download' ? snapshot.liveMbps : 0,
+      snapshot.phase === 'upload' ? snapshot.liveMbps : 0,
+    );
     visual.setProgress(snapshot.progress);
 
     if (snapshot.phase === 'reversing') {
@@ -210,6 +275,68 @@ export class TestController {
     this.deps.stats.set('upload', up.value, up.unit);
     this.deps.stats.set('ping', formatMs(snapshot.pingMs));
     this.deps.stats.set('jitter', formatMs(snapshot.jitterMs));
+  }
+
+  /**
+   * Samples the run for the monitor's graph.
+   *
+   * Throttled to the series' own resolution rather than recording every
+   * snapshot: the engine emits far faster than a graph can show, and a
+   * recording that compacts twice during a ten-second run would lose the shape
+   * it exists to keep. The phase decides which direction the reading belongs
+   * to, so a download never lands in the upload line.
+   */
+  private record(snapshot: Snapshot): void {
+    // Every phase is sampled, not just the measuring ones. Skipping latency
+    // and the reversals left a gap of several seconds with no points in it,
+    // which the graph then drew as a long diagonal from the end of the
+    // download to the start of the upload — a decay that never happened.
+    // Recording the floor through those phases makes each leg stand up as
+    // what it is.
+    if (snapshot.phase === 'idle' || snapshot.phase === 'done') return;
+    const now = performance.now();
+
+    // A phase change is the one sample that must never be thrown away. The
+    // reversal emits a single zero the instant the download ends and then
+    // says nothing for several seconds, so letting the throttle drop it left
+    // the graph with a five-second gap that the curve drew straight through
+    // as a long, gentle decline the link never performed.
+    const turned = snapshot.phase !== this.recordedPhase;
+    if (!turned && this.recordedAt !== 0 && now - this.recordedAt < SAMPLE_MS) return;
+    this.recordedPhase = snapshot.phase;
+    this.timeline += this.recordedAt === 0 ? 0 : now - this.recordedAt;
+    this.recordedAt = now;
+    this.recording.add({
+      t: this.timeline,
+      down: snapshot.phase === 'download' ? snapshot.liveMbps : 0,
+      up: snapshot.phase === 'upload' ? snapshot.liveMbps : 0,
+    });
+    this.deps.onSample();
+  }
+
+  /**
+   * Opens a gap before a new run.
+   *
+   * The idle time between runs is not drawn to scale — an afternoon between
+   * two tests would leave both squeezed into a pixel — so runs are butted up
+   * against each other with a floor sample between them. That keeps each run
+   * legible and still says, unambiguously, that they are separate runs.
+   */
+  private beginRecording(): void {
+    this.recordedPhase = 'idle';
+    if (this.recording.all.length > 0) {
+      this.timeline += SAMPLE_MS;
+      this.recording.add({ t: this.timeline, down: 0, up: 0 });
+      this.timeline += SAMPLE_MS;
+    }
+    this.recordedAt = 0;
+  }
+
+  /** Closes a run off at the floor, so the next one starts from nothing. */
+  private endRecording(): void {
+    if (this.recording.all.length === 0) return;
+    this.timeline += SAMPLE_MS;
+    this.recording.add({ t: this.timeline, down: 0, up: 0 });
   }
 
   private async persist(snapshot: Snapshot, peer: Peer | null): Promise<void> {
