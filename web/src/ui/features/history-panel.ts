@@ -70,7 +70,11 @@ export class HistoryPanel extends Component {
       return el('p', { class: 'empty-state' }, 'No results yet — run a test to start the history.');
     }
 
-    const list = el('div', { class: 'list' });
+    // Scrolls within itself so the page stays one screen tall however long the
+    // history grows. The rows are a list you dip into, not something you read
+    // to the end, so pushing the rest of the page down to show all of them is
+    // the wrong trade.
+    const list = el('div', { class: 'list list--scroll', tabindex: '0' });
     for (const result of results) {
       const meta = [result.isp, result.server_name, result.client_ip].filter(Boolean).join(' · ');
       const row = el(

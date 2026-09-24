@@ -29,6 +29,7 @@ const MODES: readonly [ThemeMode, string, IconName][] = [
 export class TopBar extends Component<HTMLElement> {
   private readonly themeToggle: HTMLButtonElement;
   private graphButton: HTMLButtonElement | null = null;
+  private modeSlot!: HTMLElement;
   private readonly menus: MenuButton[] = [];
   private readonly onScroll = (): void => {
     this.root.dataset.scrolled = String(window.scrollY > 4);
@@ -46,8 +47,12 @@ export class TopBar extends Component<HTMLElement> {
     if (handlers.peers().length > 0) actions.push(this.buildServerMenu().root);
     actions.push(this.themeToggle, this.buildSettingsMenu().root);
 
+    // The mode switch sits between the brand and the actions: it is the
+    // page's primary choice, so it belongs with the identity rather than
+    // among the settings controls.
+    this.modeSlot = el('div', { class: 'top-bar__modes' });
     this.root.append(
-      el('div', { class: 'top-bar__inner' }, this.buildBrand(), ...actions),
+      el('div', { class: 'top-bar__inner' }, this.buildBrand(), this.modeSlot, ...actions),
     );
     hydrateRipples(this.root);
 
@@ -95,6 +100,18 @@ export class TopBar extends Component<HTMLElement> {
     button.addEventListener('click', () => this.handlers.onGraph());
     this.graphButton = button;
     return button;
+  }
+
+  /**
+   * Puts the mode switch in the bar, or takes it out.
+   *
+   * Removed on screens that have no mode — a saved result is neither auto nor
+   * manual, and a switch offering a choice that does not apply is worse than
+   * no switch.
+   */
+  setModes(modes: HTMLElement | null): void {
+    if (modes) this.modeSlot.replaceChildren(modes);
+    else this.modeSlot.replaceChildren();
   }
 
   /** Marks the graph as the thing currently on screen. */

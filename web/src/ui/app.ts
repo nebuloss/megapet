@@ -22,6 +22,7 @@ import {
   directPeer,
 } from './features';
 import { el } from './primitives/dom';
+import { bindShortcuts } from './shortcuts';
 import { formatRate } from './primitives/format';
 
 /**
@@ -55,6 +56,7 @@ export class App {
   /** The mode whose controls the main page shows, graph page included. */
   private mode: Mode = 'auto';
   private readonly graph: GraphModal;
+  private releaseShortcuts: (() => void) | null = null;
 
   private peer: Peer | null;
   /** Configured backends, plus the server's own address when it is usable. */
@@ -158,13 +160,19 @@ export class App {
         'div',
         { class: 'app-shell' },
         this.topBar.root,
-        this.modes.root,
         this.main,
         this.buildFooter(),
       ),
       this.graph.root,
       this.liveRegion,
     );
+
+    this.releaseShortcuts = bindShortcuts({
+      onGraph: () => this.toggleGraph(),
+      onToggleRun: () => this.toggleRun(),
+      onToggleDownload: () => this.monitor.toggleDirection('down'),
+      onToggleUpload: () => this.monitor.toggleDirection('up'),
+    });
 
     this.router
       .add('/r/:id', ({ id }) => this.showResult(id ?? ''))
@@ -183,6 +191,7 @@ export class App {
     this.resultView?.destroy();
     this.monitor.destroy();
     this.graph.destroy();
+    this.releaseShortcuts?.();
     this.snackbar.destroy();
   }
 
@@ -210,7 +219,7 @@ export class App {
     );
 
     this.modes.setMode(mode);
-    this.modes.root.hidden = false;
+    this.topBar.setModes(this.modes.root);
 
     // Manual mode takes the dial's place: they are two ways of doing the same
     // thing, not two things to do. The graph is neither, and lives over the
@@ -263,7 +272,7 @@ export class App {
 
   private showResult(id: string): void {
     // A saved result is neither mode, so the switch has nothing to say here.
-    this.modes.root.hidden = true;
+    this.topBar.setModes(null);
     this.topBar.setGraphActive(false);
     this.resultView?.destroy();
     this.resultView = new ResultView(this.api, this.snackbar, () => this.router.navigate('/'));
@@ -339,6 +348,21 @@ export class App {
       this.monitor.setMode(mode);
       this.monitor.refresh();
     }
+  }
+
+  /**
+   * Starts or stops whichever mode is selected, for the keyboard shortcut.
+   *
+   * The shortcut follows the mode rather than the screen, so it does the same
+   * thing whether or not the graph happens to be open over the page.
+   */
+  private toggleRun(): void {
+    if (this.mode === 'manual') {
+      this.monitor.toggleRun();
+      return;
+    }
+    if (this.tests.isRunning) this.tests.abort();
+    else if (!this.monitor.isRunning) void this.tests.run(this.peer);
   }
 
   /** Which mode is loading the link, if either. */

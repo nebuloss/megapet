@@ -48,13 +48,19 @@ export class ModeTabs extends Component<HTMLElement> {
   private running: Mode | null = null;
 
   constructor(handlers: ModeTabsHandlers) {
-    super(el('div', { class: 'modes' }));
+    super(
+      el('div', {
+        class: 'modes',
+        role: 'tablist',
+        'aria-label': 'Test mode',
+      }),
+    );
 
-    const tablist = el('div', {
-      class: 'modes__tabs',
-      role: 'tablist',
-      'aria-label': 'Test mode',
-    });
+    // A sliding indicator behind the two labels, so the control reads as one
+    // switch with a position rather than two buttons that happen to differ in
+    // colour. It is decorative: the pressed state is on the tabs themselves.
+    const tablist = this.root;
+    tablist.append(el('span', { class: 'modes__thumb', 'aria-hidden': 'true' }));
 
     for (const spec of MODES) {
       const tab = el('button', {
@@ -66,12 +72,7 @@ export class ModeTabs extends Component<HTMLElement> {
       }) as HTMLButtonElement;
       tab.append(
         el('span', { class: 'modes__icon', html: icon(spec.icon) }),
-        el(
-          'span',
-          { class: 'modes__text' },
-          el('span', { class: 'modes__label' }, spec.label),
-          el('span', { class: 'modes__hint' }, spec.hint),
-        ),
+        el('span', { class: 'modes__label' }, spec.label),
         el('span', { class: 'modes__live', 'aria-hidden': 'true' }),
       );
       tab.addEventListener('click', () => handlers.onSelect(spec.mode));
@@ -79,7 +80,6 @@ export class ModeTabs extends Component<HTMLElement> {
       tablist.append(tab);
     }
 
-    this.root.append(tablist);
     this.paint();
     hydrateRipples(this.root);
   }
@@ -108,5 +108,8 @@ export class ModeTabs extends Component<HTMLElement> {
       const spec = MODES.find((m) => m.mode === mode)!;
       tab.setAttribute('aria-label', live ? `${spec.label} — running` : spec.label);
     }
+    // Drives the sliding indicator from CSS rather than from measurement, so
+    // it cannot be wrong before the control has been laid out.
+    this.root.dataset.mode = this.current;
   }
 }

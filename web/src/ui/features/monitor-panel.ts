@@ -918,6 +918,27 @@ export class MonitorPanel extends Component<HTMLElement> {
    * broken button; swapping is what someone pressing it almost certainly
    * meant.
    */
+  /**
+   * Turns a direction on or off from outside, for the keyboard shortcut.
+   *
+   * Refused while the speed test owns the link, exactly as the switches are:
+   * a shortcut that does something the visible control refuses would be worse
+   * than no shortcut.
+   */
+  toggleDirection(key: DirectionKey): boolean {
+    if (this.blocked !== null || this.mode === 'auto') return false;
+    this.flip(key);
+    return true;
+  }
+
+  /** Starts or stops a session, for the keyboard shortcut. */
+  toggleRun(): boolean {
+    if (this.blocked !== null) return false;
+    if (!this.running && !this.directions.down && !this.directions.up) return false;
+    this.toggle();
+    return true;
+  }
+
   private flip(key: DirectionKey): void {
     // Each switch means only itself. Turning the other one on to avoid an
     // empty pair made the control lie about what it does — pressing

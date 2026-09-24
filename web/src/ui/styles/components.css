@@ -229,9 +229,24 @@
 
 /* ------------------------------------------------------------------ hero */
 
+/*
+ * Bounded by the viewport, so the page is one screen.
+ *
+ * The visual is the only part that can give: the reading, the button and the
+ * chips are all a fixed size, so the stage takes whatever is left rather than
+ * claiming a share of a viewport it cannot know the rest of. The subtraction
+ * covers the top bar, the mode tabs, the footer and this card's own padding.
+ */
 .hero {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   justify-items: center;
+  align-content: center;
+  /* Tall enough to fill the column beside it, short enough that the page is
+     one screen. The subtraction covers the top bar, the mode tabs, the footer
+     and the shell's own margins. */
+  height: calc(100dvh - 17rem);
+  max-height: calc(100dvh - 17rem);
   gap: 1.5rem;
   padding: clamp(1.5rem, 5vw, 2.5rem) 1.25rem;
   border-radius: var(--md-sys-shape-corner-xl);
@@ -487,6 +502,31 @@
 .list {
   display: grid;
   gap: 0.375rem;
+}
+
+/*
+ * A history that scrolls inside itself.
+ *
+ * Bounded by viewport height rather than a row count: the point is that the
+ * page stays one screen whatever is in it, and a fixed number of rows would
+ * still overflow a short window. The small bottom padding leaves the last row
+ * visibly cut off, which is what tells you there is more without needing a
+ * separate affordance.
+ */
+.list--scroll {
+  max-height: clamp(9rem, 32dvh, 22rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+  /* Keyboard scrolling needs focus, and focus needs to be visible. */
+  scroll-padding-block: 0.5rem;
+}
+
+.list--scroll:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 3px;
+  border-radius: var(--md-sys-shape-corner-m);
 }
 
 .list-row {
@@ -762,10 +802,19 @@
  * Sized by height, not width. A fixed width made the scene as tall as its
  * aspect ratio demanded, which pushed the page past the viewport on a laptop;
  * driving it from the viewport height means it shrinks to fit instead.
+ *
+ * The budget is what is left after everything that is not the stage: the top
+ * bar, the mode tabs, the reading and its unit, the start button, the
+ * connection chips and the footer. Sizing the stage alone at half the viewport
+ * left the page a couple of hundred pixels too tall on a laptop, which is
+ * exactly the scroll this is meant to avoid.
  */
 .lift__stage {
   aspect-ratio: 280 / 384;
-  height: clamp(17rem, 48dvh, 30rem);
+  /* Fills the row the hero left for it, down to a floor that keeps the
+     mechanism legible. */
+  height: 100%;
+  min-height: 9rem;
   max-width: min(23rem, 84vw);
 }
 
@@ -1270,88 +1319,97 @@
   }
 }
 
+/* Passes the hero's bounded row down to the visual inside it, which is the
+   only element that can absorb a short viewport. */
 .hero__visual {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   justify-items: center;
+  align-content: center;
   width: 100%;
+  min-height: 0;
 }
 
 /* ------------------------------------------------- continuous monitor */
 
 /* ---------------------------------------------------------- mode switch */
 
+/*
+ * A two-position switch, not two buttons.
+ *
+ * The indicator slides between the halves so the control has a *position*
+ * rather than a highlighted member, which is what makes a segmented control
+ * read as one thing. It is sized in fractions of the track, so nothing has to
+ * be measured and it cannot be wrong before layout.
+ */
 .modes {
-  width: min(48rem, 100%);
-  margin: 0 auto 1rem;
-  padding: 0 var(--page-gutter);
-}
-
-.modes__tabs {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.125rem;
+  padding: 0.2rem;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
 }
 
-.modes[hidden] {
-  display: none;
+.modes__thumb {
+  position: absolute;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  left: 0.2rem;
+  width: calc(50% - 0.2rem);
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+  transition: transform var(--md-sys-motion-duration-short, 150ms)
+    var(--md-sys-motion-standard, ease);
+}
+
+.modes[data-mode='manual'] .modes__thumb {
+  transform: translateX(100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modes__thumb {
+    transition: none;
+  }
 }
 
 .modes__tab {
-  display: flex;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 0.9rem;
-  border-radius: var(--md-sys-shape-corner-l);
-  border: 1px solid var(--md-sys-color-outline);
-  background: var(--md-sys-color-surface-container);
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
   color: var(--md-sys-color-on-surface-variant);
+  font: var(--md-sys-typescale-label-large);
+  white-space: nowrap;
   cursor: pointer;
-  text-align: left;
 }
 
 .modes__tab[data-selected='true'] {
-  background: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
-  border-color: transparent;
+  color: var(--md-sys-color-on-surface);
 }
 
 .modes__icon {
   display: inline-flex;
-  flex: none;
 }
 
 .modes__icon svg {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.modes__text {
-  display: grid;
-  gap: 0.1rem;
-  min-width: 0;
-}
-
-.modes__label {
-  font: var(--md-sys-typescale-label-large);
-}
-
-/* The hint is what makes two one-word tabs mean something. It is the first
-   thing to go when the screen is narrow, because by then you have used them. */
-.modes__hint {
-  font: var(--md-sys-typescale-label-small);
-  opacity: 0.8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 /* A running mode keeps a dot, so leaving one going and looking at the other is
-   safe: the tab bar always says what the link is doing. */
+   safe: the switch always says what the link is doing. */
 .modes__live {
-  width: 0.5rem;
-  height: 0.5rem;
-  flex: none;
-  margin-left: auto;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
   background: var(--md-sys-color-primary);
   opacity: 0;
@@ -1378,15 +1436,27 @@
   }
 }
 
-@media (max-width: 30rem) {
-  .modes__hint {
+/* In the bar the switch sits beside the brand, with the actions pushed to the
+   far end. */
+/* The brand already pushes everything after it to the right, so the switch
+   only needs to sit next to it and let the actions take the far end. */
+.top-bar__modes {
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+}
+
+@media (max-width: 40rem) {
+  /* The icons carry the meaning once there is no room for both words. */
+  .modes__tab .modes__label {
     display: none;
+  }
+
+  .top-bar__modes {
+    margin-left: 0.35rem;
   }
 }
 
-/* In the hero the panel is the mode itself, not a card inside one: the hero
-   already provides the surface, so a second background inside it reads as a
-   box within a box. */
 .monitor[data-compact='true'] .monitor__chart {
   height: clamp(14rem, 42dvh, 24rem);
 }

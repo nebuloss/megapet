@@ -143,7 +143,7 @@ mounted `SpeedVisual`. Phases are `idle -> latency -> reversing -> download ->
 reversing -> upload -> done`, with fixed progress `WEIGHTS` per phase.
 
 There is a second shape of test: **manual mode** (`engine/monitor.ts` +
-`ui/features/monitor-panel.ts`). A segmented control
+`ui/features/monitor-panel.ts`). A two-position switch in the top bar
 (`ui/features/mode-tabs.ts`) chooses between **Auto**, the staged run, and
 **Manual**, the open-ended one, and the two are alternatives in the same place
 — manual mode's controls replace the speed dial in the hero rather than
@@ -278,6 +278,16 @@ Non-obvious frontend invariants:
   threw used to leave the handle set with nothing scheduled, so the loop was
   dead and could never restart: the graph froze while the readouts beside it
   carried on.
+- **The page is one screen.** `.hero` is bounded by viewport height and the
+  history scrolls inside itself, because the visual is the only part that can
+  give — the reading, the button and the chips are all a fixed size.
+- **Unknown paths are rewritten, not just rendered.** The server serves the app
+  for anything, so a stale URL like `/graph` would otherwise render the right
+  page under a wrong address that can be bookmarked and shared. `Router`
+  replaces rather than pushes, or going back would re-correct in a loop.
+- **Single-key shortcuts** (`ui/shortcuts.ts`): G graph, D/U directions, Space
+  start/stop. Suppressed while typing and whenever a modifier is held, so
+  nothing shadows a browser or assistive-technology binding.
 - **The top bar and mode tabs stay above the scrim.** The bar's graph button
   is a toggle, so covering it leaves the control that opened the dialog unable
   to close it; the tabs matter because the graph shows whichever mode is
