@@ -32,6 +32,32 @@ them back here before syncing again or the change is lost.
 - `web/src/engine` — the browser-side measurement engine. `grace_seconds` and
   the post-grace window are what make the figures honest; do not "simplify" the
   meter into a naive total-bytes-over-total-time calculation.
+- The two tests are **Auto** (staged) and **Manual** (open-ended) in the UI;
+  in the code the latter is still `Monitor`/`MonitorPanel`.
+- The engine runs two shapes of test. `runner.ts` is the staged run — latency,
+  download, upload — that produces a result worth saving. `monitor.ts` is the
+  continuous one: it never stops on its own, saves nothing, and keeps a graph
+  instead of a result. It needed no new endpoint, because a phase whose
+  `durationMs` is `Infinity` is the only thing the transfer machinery was
+  missing; an endless phase is *ended* by its caller, so an abort returns a
+  result there rather than throwing as it does for a phase cut short.
+- The monitor takes `Directions` — two independent switches, not three named
+  modes. "Download", "upload" and "both" are three names for two booleans, and
+  naming the combination separately means the engine, the buttons and the graph
+  each have to remember that `both` implies the other two. The UI switches
+  double as the graph's legend, so the colour that turns a line on is the
+  colour it is drawn in. At least one must be on: turning off the last one
+  turns the other on rather than refusing.
+- With both directions on, the two figures are **not** independent measurements:
+  they share the link, and saturating the uplink delays the acks the downlink
+  needs. The UI says so on screen whenever both are selected, and anything that
+  reports these numbers should too.
+- `web/src/engine/series.ts` — the graph's history, bounded by halving its own
+  resolution when it fills. Two rules it exists to enforce: peaks and totals
+  come from the **raw** samples, never read back off the compacted points, or
+  the recorded maximum decays the longer you watch; and a merged pair takes the
+  **earlier** timestamp, never the midpoint, or the start of the session walks
+  forward and the axis quietly understates how long it has been running.
 - `web/src/mech` — a standalone mechanics library: plane geometry, spur gears,
   belt drives, rope, springs and detents, plus the SVG path generation for all
   of them. It knows nothing about the speedtest and is covered by unit tests
@@ -81,7 +107,7 @@ them back here before syncing again or the change is lost.
 - The dial scale is **logarithmic**, so animate the fraction, never the Mbps.
   Easing the value and converting per frame swept the needle across half the
   dial in the first frame of every phase.
-- `web/src/ui/theme/controller.ts` — generates every `--md-sys-color-*` token
+- `web/src/theme/controller.ts` — generates every `--md-sys-color-*` token
   from one seed. Stylesheets must only ever read those tokens, never hard-code
   a colour.
 
