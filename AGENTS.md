@@ -206,6 +206,15 @@ Non-obvious frontend invariants:
   drawn as a provisional point at "now" (`ui/visuals/leading-edge.ts`), for
   *whichever* test is running. Drawn only from committed samples the line grows
   in once-a-second jumps, which is the staircase this removes.
+- **The graph dialog fits rather than scrolls.** A scrollbar down its side
+  means the dialog is the wrong size: the plot and its figures are one glance,
+  and a strip hidden below the fold is a strip nobody reads. The plot is the
+  elastic part; the panel takes its height from its content, capped by the
+  viewport.
+- **Six figures, not eight.** The averages went: the graph *is* the average,
+  drawn, and a number that only agrees with the picture beside it has to earn
+  its place. Peaks stay, because a peak is what a scrolled-away graph cannot
+  tell you, and "Both" is the sum — what the shared link is actually carrying.
 - **A direction carrying nothing is *at* zero, not easing towards it.** The
   leading edge eases, so easing it down from the last reading leaves the pen
   above a line already on the floor — a dip and a climb back, describing a

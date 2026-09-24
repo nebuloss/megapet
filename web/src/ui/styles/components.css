@@ -2157,11 +2157,25 @@
  * height is what stops the readouts below it pushing the whole thing off the
  * bottom, which is exactly what made this unusable as a page.
  */
+/*
+ * Fits rather than scrolls.
+ *
+ * A scrollbar down the side of a dialog means the dialog is the wrong size,
+ * not that the reader wants to scroll: the graph and its figures are one
+ * glance, and a strip of them hidden below the fold is a strip nobody reads.
+ * The plot is the elastic part, so it takes whatever the headings, the
+ * controls and the figures leave.
+ */
 .graph-modal__panel {
   position: relative;
+  display: grid;
+  gap: 0.75rem;
   width: min(72rem, 100%);
+  /* Height comes from the content, capped by the viewport. A fixed height
+     leaves a band of empty surface under the buttons whenever the content is
+     shorter, which reads as something failing to load. */
   max-height: min(46rem, 92dvh);
-  overflow: auto;
+  align-self: center;
   padding: 1.25rem;
   border-radius: var(--md-sys-shape-corner-xl);
   background: var(--md-sys-color-surface-container-high);
@@ -2232,8 +2246,30 @@ body[data-modal='open'] .modes {
   display: none;
 }
 
+/* The blurb explains manual mode; over the graph it is a paragraph between
+   the reader and the picture they opened. */
+.graph-modal__body .monitor__blurb {
+  display: none;
+}
+
+/* The panel inside inherits the dialog's own rows, so the plot is what
+   absorbs a short window. */
+.graph-modal__body,
+.graph-modal__body .monitor {
+  display: grid;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.graph-modal__body .monitor__plot {
+  min-height: 0;
+}
+
 .graph-modal__body .monitor__chart {
-  height: clamp(12rem, 38dvh, 20rem);
+  /* Bounded by the viewport rather than fixed: tall enough to read on a
+     laptop, short enough that the figures under it are never pushed out of
+     sight on a small one. */
+  height: clamp(9rem, 40dvh, 22rem);
 }
 
 /* Readouts go side by side rather than stacking into a column that has to be

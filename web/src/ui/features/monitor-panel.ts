@@ -298,6 +298,7 @@ export class MonitorPanel extends Component<HTMLElement> {
     this.live = { down, up };
     this.setRate('down', down);
     this.setRate('up', up);
+    this.setRate('both', down + up);
     this.treadmill.setRate(down + up);
   }
 
@@ -607,11 +608,11 @@ export class MonitorPanel extends Component<HTMLElement> {
     // He runs at whatever the link is carrying, both directions together:
     // the treadmill is about effort, not about which way the bytes are going.
     this.treadmill.setRate(update.downMbps + update.upMbps);
-    this.setReadout('elapsed', formatElapsed(update.elapsedMs), '');
     this.setRate('down', update.downMbps);
     this.setRate('up', update.upMbps);
-    this.setRate('avg-down', update.avgDownMbps);
-    this.setRate('avg-up', update.avgUpMbps);
+    // What the link is carrying, which on a shared line is the figure to hold
+    // against a rate rather than either direction on its own.
+    this.setRate('both', update.downMbps + update.upMbps);
     this.setReadout('moved', formatBytes(update.downBytes + update.upBytes), '');
   }
 
@@ -710,11 +711,6 @@ export class MonitorPanel extends Component<HTMLElement> {
     this.setRate('peak-down', stats.peakDown);
     this.setRate('peak-up', stats.peakUp);
 
-    // The elapsed figure is the graph's own, whoever is filling it; the rates
-    // are pushed in by whichever test is running.
-    if (this.blocked !== null) {
-      this.setReadout('elapsed', formatElapsed(series.last?.t ?? 0), '');
-    }
 
     this.paintAxis(view, newest);
     this.paintMarkers(view, lead, shown, live);
@@ -820,7 +816,12 @@ export class MonitorPanel extends Component<HTMLElement> {
 
     const span = view.toMs - view.fromMs;
     const following = this.viewport.isFocused;
-    this.spanLabel.textContent = span > 0 ? `${formatSpan(span)} window` : '';
+    // How long the session has run, beside how much of it is on screen. It
+    // was a readout of its own; it belongs with the window it qualifies, and
+    // that is one fewer tile in a grid that had too many.
+    const elapsed = this.source().last?.t ?? 0;
+    this.spanLabel.textContent =
+      span > 0 ? `${formatElapsed(elapsed)} · ${formatSpan(span)} window` : '';
     this.focusButton.dataset.on = String(following);
     this.focusButton.setAttribute('aria-pressed', String(following));
   }
@@ -1280,14 +1281,24 @@ export class MonitorPanel extends Component<HTMLElement> {
 
   private buildReadouts(): HTMLElement {
     const grid = el('div', { class: 'monitor__readouts' });
+    /*
+     * Six figures, not eight.
+     *
+     * The averages are gone: the graph is the average, drawn, and a number
+     * that only agrees with the picture beside it earns its place by being
+     * read more precisely than the picture can be. Peaks stay, because a peak
+     * is the one thing a scrolled-away graph cannot tell you.
+     *
+     * "Both" is the sum of the two directions, which is what the link is
+     * actually carrying — the figure to compare against a line rate when
+     * something is running in both directions at once.
+     */
     const cells: [key: string, label: string][] = [
-      ['down', 'Download now'],
-      ['up', 'Upload now'],
-      ['avg-down', 'Download average'],
-      ['avg-up', 'Upload average'],
-      ['peak-down', 'Download peak'],
-      ['peak-up', 'Upload peak'],
-      ['elapsed', 'Elapsed'],
+      ['down', 'Download'],
+      ['up', 'Upload'],
+      ['both', 'Both'],
+      ['peak-down', 'Peak down'],
+      ['peak-up', 'Peak up'],
       ['moved', 'Transferred'],
     ];
     for (const [key, label] of cells) {
