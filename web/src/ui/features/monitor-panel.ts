@@ -355,7 +355,11 @@ export class MonitorPanel extends Component<HTMLElement> {
       this.controlsRow,
       ...(this.showGraph ? [this.plot] : []),
       this.warning,
-      ...(this.showGraph && !this.compact ? [this.readoutGrid] : []),
+      // Shown with the graph, wherever the graph is. This used to also require
+      // a non-compact panel, which stopped being reachable when the graph
+      // became a view of the one page — so the figures beside the plot
+      // silently disappeared.
+      ...(this.showGraph ? [this.readoutGrid] : []),
       this.actions,
     );
   }

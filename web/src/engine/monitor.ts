@@ -162,6 +162,8 @@ class Leg {
 
 export class Monitor {
   private running = false;
+  /** Set between asking the legs to stop and their actually having stopped. */
+  private stopping = false;
   private readonly series = new TimeSeries(CAPACITY, SAMPLE_MS);
   private readonly legs: Record<Key, Leg>;
 
@@ -281,11 +283,33 @@ export class Monitor {
     return { down: this.legs.down.liveMbps, up: this.legs.up.liveMbps };
   }
 
+  /**
+   * Ends the session.
+   *
+   * The only thing that does. A leg finishing — because it failed, or because
+   * the visitor switched that direction off — leaves the session open, with
+   * its clock and its graph still running.
+   */
   stop(): void {
-    if (!this.running) return;
-    this.running = false;
+    if (!this.running || this.stopping) return;
+    this.stopping = true;
     this.legs.down.stop();
     this.legs.up.stop();
+    this.settleIfStopped();
+  }
+
+  /**
+   * Finishes the session once it has been stopped *and* its legs have wound
+   * down. Both halves matter: resolving while a leg is still finishing would
+   * report the session over while bytes were still moving.
+   */
+  private settleIfStopped(): void {
+    if (!this.stopping) return;
+    if (this.legs.down.running || this.legs.up.running) return;
+    this.running = false;
+    this.stopping = false;
+    this.finished?.();
+    this.finished = null;
   }
 
   /**
@@ -322,6 +346,7 @@ export class Monitor {
     }
 
     this.running = true;
+    this.stopping = false;
     this.handlers = handlers;
     const last = this.series.last;
     // Resuming continues the timeline; a fresh session starts it. The wall
@@ -361,19 +386,23 @@ export class Monitor {
         this.stop();
       },
     );
-    // The session ends when nothing is loading the link any more — whether
-    // that is the visitor stopping it or the last leg failing.
-    if (!this.legs.down.running && !this.legs.up.running) {
-      this.running = false;
-      this.finished?.();
-      this.finished = null;
-    }
+    // A leg ending is not the session ending. Switching the last direction off
+    // leaves a session that is measuring nothing, which is a thing to want —
+    // let the link settle and watch it unloaded — and the clock, the graph and
+    // the history carry on. Only `stop` ends a session, so ending it here made
+    // turning off the last switch silently kill the run.
+    this.settleIfStopped();
   }
 
   private sample(): void {
     const { down, up } = this.reading();
     this.series.add({ t: this.timeBase + (performance.now() - this.startedAt), down, up });
     this.handlers?.onSample(this.series);
+    // The readouts are driven from here as well as from the legs, because a
+    // session with every direction switched off has no legs ticking — and its
+    // clock is still running. Left to the legs alone, the elapsed time froze
+    // the moment the last direction was turned off.
+    this.emit();
   }
 
   private emit(): void {

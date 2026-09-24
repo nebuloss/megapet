@@ -82,8 +82,11 @@ export class TopBar extends Component<HTMLElement> {
    */
   private buildGraphButton(): HTMLButtonElement {
     const button = el('button', {
+      // `data-control` is a stable hook: the title and label below say which
+      // way the button currently points, so neither identifies it.
       class: 'icon-button',
       type: 'button',
+      'data-control': 'graph',
       'aria-pressed': 'false',
       title: 'Graph',
       'aria-label': 'Show the graph of everything measured so far',
