@@ -7,8 +7,45 @@ versions follow [Semantic Versioning](https://semver.org).
 
 ## Unreleased
 
+## 1.2.0 — 2026-09-24
+
+Results are now measured by the server rather than reported by the browser.
+**This is a breaking change to the API and to the stored schema**, described
+under *Removed* below.
+
+### Added
+
+- **Manual mode.** The staged run answers "how fast is this link right now"
+  and stops; manual mode answers "what does it do over time". Choose download,
+  upload or both — or neither, to record an idle baseline — and it runs until
+  you stop it, plotting throughput on the same logarithmic scale the dial
+  uses. It needed no new endpoint: the measurement endpoints already stream
+  for as long as anyone reads or writes.
+- **A graph**, opened over the page from the top bar. Zoom, pan, and a
+  *follow* switch that is deliberately separate from zoom — you can be zoomed
+  right in and following the live edge, or zoomed out and parked over
+  something five minutes old. Both modes record into it, so a morning of spot
+  checks reads as one picture.
+- **CSV export** of a session: one row per sample, with both an elapsed offset
+  and a wall-clock timestamp, so a dip can be lined up against a router graph.
+- `POST /api/runs` and `POST /api/runs/{id}/close`, which open and close a
+  measured run.
+- Keyboard shortcuts: `G` for the graph, `D` and `U` for the directions,
+  `Space` to start or stop.
+
 ### Changed
 
+- **Upload no longer reads slower than download on a symmetric link.** Two
+  causes, both in how hard the test tried rather than in the link: it opened
+  four streams against download's six, and it sized each request for a quarter
+  of a second, which on a fast link made request turnaround rather than the
+  connection decide the figure.
+- The page is one screen: the history scrolls within itself and the hero is
+  bounded by viewport height.
+- The mode switch lives in the top bar.
+- Unknown paths are corrected in the address bar rather than merely rendering
+  the application under a URL that no longer exists.
+- Exports are named `megapet-<date>-<time>.csv`.
 - The lift now rests at the ground floor rather than hanging at the top of its
   shaft, and the run has a shape to match: the car is called up while the ping
   is taken, carries the download down, the upload up, and comes home once the
@@ -17,6 +54,39 @@ versions follow [Semantic Versioning](https://semver.org).
 - Latency probes are no longer measured underneath the opening animation. A
   ping on a local link is a millisecond or two, small enough that one janked
   frame outweighs it, so the visual's settling move is allowed to finish first.
+- Nookies is redrawn from the plush he is meant to be.
+
+### Removed
+
+- **`POST /api/results` is gone, and nothing replaces it.** Results used to
+  arrive as a figure in a request body: the browser measured the link and
+  asked the server to store the number. Nothing about that can be checked, so
+  the history was a list of claims rather than measurements, and the endpoint
+  was an unauthenticated write into the database. The server already counted
+  every byte it sent and received — those bytes now belong to a named run, and
+  the stored figures are the ones this process observed.
+- **Latency is no longer stored.** A round trip can only be timed by the end
+  that sends the first byte, and that is the browser. Inferring one from the
+  gaps between probes would produce a number carrying the client's own
+  scheduling jitter while wearing the name "ping". It is still measured and
+  shown live; the `ping_ms`, `jitter_ms`, `ping_min_ms` and `ping_max_ms`
+  columns are dropped, along with the ping figures in `/api/summary`.
+
+### Fixed
+
+- A truncated upload was reported to the client as complete.
+- Unrouted `/api/` paths fell through to the frontend, so a removed endpoint
+  answered with the application shell and a `200`.
+- The server warns at startup when no trusted proxies are configured, where
+  every visitor otherwise resolves to the proxy and silently shares one
+  identity, one stream budget, and each other's runs.
+
+### Upgrading
+
+An existing database keeps working; SQLite ignores the dropped columns, and
+old rows survive minus their latency figures. Anything that posted to
+`/api/results` will now receive a `404` — there is deliberately no way to
+submit a measurement.
 
 ## 1.1.0 — 2026-09-03
 
