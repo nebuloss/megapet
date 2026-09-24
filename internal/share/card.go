@@ -92,8 +92,10 @@ func Render(w io.Writer, c Card) error {
 		fmt.Fprintf(&b, `<text x="%d" y="394" %s font-size="28" font-weight="600" fill="#E5E1E9">%s</text>`,
 			x+20, font, esc(value))
 	}
-	chip(56, "Ping", formatMs(r.PingMs))
-	chip(276, "Jitter", formatMs(r.JitterMs))
+	// No latency chip: a round trip can only be timed by the end that starts
+	// it, so the server never observed one and has nothing honest to print.
+	chip(56, "Downloaded", formatBytes(r.DownloadBytes))
+	chip(276, "Uploaded", formatBytes(r.UploadBytes))
 	chip(496, "Transferred", formatBytes(r.DownloadBytes+r.UploadBytes))
 
 	if r.ID != "" {
@@ -119,16 +121,6 @@ func formatSpeed(mbps float64) string {
 	default:
 		return fmt.Sprintf("%.2f", mbps)
 	}
-}
-
-func formatMs(ms float64) string {
-	if ms <= 0 {
-		return "—"
-	}
-	if ms >= 100 {
-		return fmt.Sprintf("%.0f ms", ms)
-	}
-	return fmt.Sprintf("%.1f ms", ms)
 }
 
 func formatBytes(n int64) string {

@@ -23,10 +23,6 @@ type Result struct {
 
 	DownloadMbps float64 `json:"download_mbps"`
 	UploadMbps   float64 `json:"upload_mbps"`
-	PingMs       float64 `json:"ping_ms"`
-	JitterMs     float64 `json:"jitter_ms"`
-	PingMinMs    float64 `json:"ping_min_ms"`
-	PingMaxMs    float64 `json:"ping_max_ms"`
 
 	DownloadBytes int64 `json:"download_bytes"`
 	UploadBytes   int64 `json:"upload_bytes"`
@@ -50,10 +46,8 @@ type Summary struct {
 	Since           string  `json:"since,omitempty"`
 	AvgDownloadMbps float64 `json:"avg_download_mbps"`
 	AvgUploadMbps   float64 `json:"avg_upload_mbps"`
-	AvgPingMs       float64 `json:"avg_ping_ms"`
 	MaxDownloadMbps float64 `json:"max_download_mbps"`
 	MaxUploadMbps   float64 `json:"max_upload_mbps"`
-	MinPingMs       float64 `json:"min_ping_ms"`
 }
 
 // DB wraps the SQLite handle.
@@ -65,10 +59,6 @@ CREATE TABLE IF NOT EXISTS results (
   created_at     INTEGER NOT NULL,
   download_mbps  REAL    NOT NULL DEFAULT 0,
   upload_mbps    REAL    NOT NULL DEFAULT 0,
-  ping_ms        REAL    NOT NULL DEFAULT 0,
-  jitter_ms      REAL    NOT NULL DEFAULT 0,
-  ping_min_ms    REAL    NOT NULL DEFAULT 0,
-  ping_max_ms    REAL    NOT NULL DEFAULT 0,
   download_bytes INTEGER NOT NULL DEFAULT 0,
   upload_bytes   INTEGER NOT NULL DEFAULT 0,
   client_ip      TEXT    NOT NULL DEFAULT '',
@@ -139,29 +129,27 @@ func (d *DB) Save(ctx context.Context, r *Result) error {
 	}
 	_, err := d.sql.ExecContext(ctx, `
 		INSERT INTO results (
-			id, created_at, download_mbps, upload_mbps, ping_ms, jitter_ms,
-			ping_min_ms, ping_max_ms, download_bytes, upload_bytes,
+			id, created_at, download_mbps, upload_mbps, download_bytes, upload_bytes,
 			client_ip, isp, asn, country, city, user_agent, platform,
 			server_id, server_name, note
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		r.ID, r.CreatedAt.UnixMilli(), r.DownloadMbps, r.UploadMbps, r.PingMs, r.JitterMs,
-		r.PingMinMs, r.PingMaxMs, r.DownloadBytes, r.UploadBytes,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		r.ID, r.CreatedAt.UnixMilli(), r.DownloadMbps, r.UploadMbps,
+		r.DownloadBytes, r.UploadBytes,
 		r.ClientIP, r.ISP, r.ASN, r.Country, r.City, r.UserAgent, r.Platform,
 		r.ServerID, r.ServerName, r.Note)
 	return err
 }
 
 const selectColumns = `
-	id, created_at, download_mbps, upload_mbps, ping_ms, jitter_ms,
-	ping_min_ms, ping_max_ms, download_bytes, upload_bytes,
+	id, created_at, download_mbps, upload_mbps, download_bytes, upload_bytes,
 	client_ip, isp, asn, country, city, user_agent, platform,
 	server_id, server_name, note`
 
 func scanResult(sc interface{ Scan(...any) error }) (Result, error) {
 	var r Result
 	var ms int64
-	err := sc.Scan(&r.ID, &ms, &r.DownloadMbps, &r.UploadMbps, &r.PingMs, &r.JitterMs,
-		&r.PingMinMs, &r.PingMaxMs, &r.DownloadBytes, &r.UploadBytes,
+	err := sc.Scan(&r.ID, &ms, &r.DownloadMbps, &r.UploadMbps,
+		&r.DownloadBytes, &r.UploadBytes,
 		&r.ClientIP, &r.ISP, &r.ASN, &r.Country, &r.City, &r.UserAgent, &r.Platform,
 		&r.ServerID, &r.ServerName, &r.Note)
 	if err != nil {
@@ -229,23 +217,21 @@ func (d *DB) List(ctx context.Context, opt ListOptions) ([]Result, error) {
 func (d *DB) Summarize(ctx context.Context, since time.Time) (Summary, error) {
 	var s Summary
 	var (
-		avgD, avgU, avgP sql.NullFloat64
-		maxD, maxU, minP sql.NullFloat64
+		avgD, avgU sql.NullFloat64
+		maxD, maxU sql.NullFloat64
 	)
 	row := d.sql.QueryRowContext(ctx, `
 		SELECT COUNT(*),
-		       AVG(download_mbps), AVG(upload_mbps), AVG(ping_ms),
-		       MAX(download_mbps), MAX(upload_mbps), MIN(NULLIF(ping_ms, 0))
+		       AVG(download_mbps), AVG(upload_mbps),
+		       MAX(download_mbps), MAX(upload_mbps)
 		FROM results WHERE created_at >= ?`, since.UnixMilli())
-	if err := row.Scan(&s.Count, &avgD, &avgU, &avgP, &maxD, &maxU, &minP); err != nil {
+	if err := row.Scan(&s.Count, &avgD, &avgU, &maxD, &maxU); err != nil {
 		return Summary{}, err
 	}
 	s.AvgDownloadMbps = avgD.Float64
 	s.AvgUploadMbps = avgU.Float64
-	s.AvgPingMs = avgP.Float64
 	s.MaxDownloadMbps = maxD.Float64
 	s.MaxUploadMbps = maxU.Float64
-	s.MinPingMs = minP.Float64
 	if !since.IsZero() {
 		s.Since = since.UTC().Format(time.RFC3339)
 	}

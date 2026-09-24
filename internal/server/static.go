@@ -59,7 +59,10 @@ func (s *Server) staticHandler() http.Handler {
 		}
 
 		// Unknown path: a missing asset is a 404, anything else is a SPA route.
-		if strings.Contains(path.Base(clean), ".") {
+		// Except under /api/, which is never a page — an endpoint that does not
+		// exist has to say so rather than return the application shell with a
+		// 200, which is how a deleted endpoint looks like a working one.
+		if strings.Contains(path.Base(clean), ".") || strings.HasPrefix(clean, "api/") {
 			http.NotFound(w, r)
 			return
 		}
@@ -71,6 +74,14 @@ func (s *Server) staticHandler() http.Handler {
 }
 
 func notBuilt(w http.ResponseWriter, r *http.Request) {
+	// The same rule as the built handler: /api/ is never a page. Without this
+	// a source-only checkout answers every unrouted API call with the
+	// placeholder document and a 200, so a deleted endpoint looks alive.
+	clean := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+	if strings.HasPrefix(clean, "api/") {
+		http.NotFound(w, r)
+		return
+	}
 	if r.URL.Path != "/" && strings.Contains(path.Base(r.URL.Path), ".") {
 		http.NotFound(w, r)
 		return

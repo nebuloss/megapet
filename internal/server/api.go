@@ -11,6 +11,7 @@ import (
 
 	"github.com/nebuloss/megapet/internal/config"
 	"github.com/nebuloss/megapet/internal/netutil"
+	"github.com/nebuloss/megapet/internal/session"
 	"github.com/nebuloss/megapet/internal/share"
 	"github.com/nebuloss/megapet/internal/speed"
 	"github.com/nebuloss/megapet/internal/store"
@@ -80,37 +81,24 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	s.metrics.Handler().ServeHTTP(w, r)
 }
 
-// submission is the client-reported outcome of a test run.
-type submission struct {
-	DownloadMbps  float64 `json:"download_mbps"`
-	UploadMbps    float64 `json:"upload_mbps"`
-	PingMs        float64 `json:"ping_ms"`
-	JitterMs      float64 `json:"jitter_ms"`
-	PingMinMs     float64 `json:"ping_min_ms"`
-	PingMaxMs     float64 `json:"ping_max_ms"`
-	DownloadBytes int64   `json:"download_bytes"`
-	UploadBytes   int64   `json:"upload_bytes"`
-	Platform      string  `json:"platform"`
-	ServerID      string  `json:"server_id"`
-	ServerName    string  `json:"server_name"`
-	Note          string  `json:"note"`
+/*
+A run is opened before it starts and closed when it finishes.
+
+Nothing about the measurement travels in either request. The client says it is
+beginning a test, moves bytes through the measurement endpoints quoting the id
+it was given, and then says it has finished; the figures come from what this
+server counted while that happened. There is deliberately no way to tell the
+server how fast the link was.
+*/
+type runOpened struct {
+	ID string `json:"id"`
 }
 
-// sane clamps a client-reported number into a believable range. The browser is
-// the only thing that can measure the link, so the values cannot be verified —
-// but they can be kept from poisoning the history with NaN or absurd figures.
-func sane(v, max float64) float64 {
-	if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
-		return 0
-	}
-	return math.Min(v, max)
-}
-
-func clampBytes(v, max int64) int64 {
-	if v < 0 {
-		return 0
-	}
-	return min(v, max)
+// What a client may label a run with. Presentation only, never a measurement.
+type runClose struct {
+	ServerID   string `json:"server_id"`
+	ServerName string `json:"server_name"`
+	Note       string `json:"note"`
 }
 
 func trunc(s string, n int) string {
@@ -121,38 +109,63 @@ func trunc(s string, n int) string {
 	return s[:n]
 }
 
-func (s *Server) handleSaveResult(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
-		writeError(w, http.StatusNotImplemented, "result storage is disabled")
+func (s *Server) handleOpenRun(w http.ResponseWriter, r *http.Request) {
+	sess, err := s.runs.Create(speed.ClientAddr(r), trunc(r.UserAgent(), 400), time.Now())
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "too many tests in progress")
 		return
 	}
+	writeJSON(w, http.StatusCreated, runOpened{ID: sess.ID})
+}
 
-	var in submission
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
-		return
-	}
+/*
+Closes a run and records what the server measured.
 
+A run with nothing worth reporting is not an error and is not stored: a visitor
+who starts a test and immediately stops it has produced no measurement, and a
+row of zeroes in the history would be indistinguishable from a link that failed.
+*/
+func (s *Server) handleCloseRun(w http.ResponseWriter, r *http.Request) {
 	addr := speed.ClientAddr(r)
-	info := s.ip.Do(r.Context(), addr)
+	sess, ok := s.runs.Close(r.PathValue("id"), addr)
+	if !ok {
+		writeError(w, http.StatusNotFound, "no such test")
+		return
+	}
 
+	var in runClose
+	// A body is optional: these are labels, and a run is closed on its own
+	// merits whether or not the client had anything to add.
+	if r.Body != nil {
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+		dec.DisallowUnknownFields()
+		_ = dec.Decode(&in)
+	}
+
+	down := sess.Totals(session.Down)
+	up := sess.Totals(session.Up)
+	if down.Mbps() <= 0 && up.Mbps() <= 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"stored": false})
+		return
+	}
+
+	if s.db == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"stored": false})
+		return
+	}
+
+	info := s.ip.Do(r.Context(), addr)
 	res := store.Result{
-		DownloadMbps:  sane(in.DownloadMbps, 1e6),
-		UploadMbps:    sane(in.UploadMbps, 1e6),
-		PingMs:        sane(in.PingMs, 60_000),
-		JitterMs:      sane(in.JitterMs, 60_000),
-		PingMinMs:     sane(in.PingMinMs, 60_000),
-		PingMaxMs:     sane(in.PingMaxMs, 60_000),
-		DownloadBytes: clampBytes(in.DownloadBytes, 1<<50),
-		UploadBytes:   clampBytes(in.UploadBytes, 1<<50),
+		CreatedAt:     sess.StartedAt,
+		DownloadMbps:  down.Mbps(),
+		UploadMbps:    up.Mbps(),
+		DownloadBytes: down.Bytes,
+		UploadBytes:   up.Bytes,
 		ISP:           info.ISP,
 		ASN:           info.ASN,
 		Country:       info.Country,
 		City:          info.City,
-		UserAgent:     trunc(r.UserAgent(), 400),
-		Platform:      trunc(in.Platform, 120),
+		UserAgent:     sess.UserAgent,
 		ServerID:      trunc(in.ServerID, 64),
 		ServerName:    trunc(in.ServerName, 120),
 		Note:          trunc(in.Note, 280),
@@ -171,11 +184,12 @@ func (s *Server) handleSaveResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.ResultsSaved.Add(1)
-	s.log.Info("result saved",
+	s.log.Info("result measured",
 		"id", res.ID,
 		"download_mbps", math.Round(res.DownloadMbps*100)/100,
 		"upload_mbps", math.Round(res.UploadMbps*100)/100,
-		"ping_ms", math.Round(res.PingMs*100)/100,
+		"down_streams", down.Streams,
+		"up_streams", up.Streams,
 		"client", res.ClientIP)
 
 	writeJSON(w, http.StatusCreated, s.decorate(r, res))

@@ -24,7 +24,6 @@ func TestSaveAndGet(t *testing.T) {
 
 	in := Result{
 		DownloadMbps: 942.31, UploadMbps: 918.4,
-		PingMs: 0.42, JitterMs: 0.08, PingMinMs: 0.39, PingMaxMs: 0.91,
 		DownloadBytes: 1_178_000_000, UploadBytes: 1_148_000_000,
 		ClientIP: "10.9.9.20", ISP: "Private network", ServerName: "This server",
 	}
@@ -115,10 +114,10 @@ func TestSummarize(t *testing.T) {
 	now := time.Now()
 
 	rows := []Result{
-		{DownloadMbps: 100, UploadMbps: 50, PingMs: 10, CreatedAt: now.Add(-time.Hour)},
-		{DownloadMbps: 300, UploadMbps: 150, PingMs: 4, CreatedAt: now.Add(-2 * time.Hour)},
+		{DownloadMbps: 100, UploadMbps: 50, CreatedAt: now.Add(-time.Hour)},
+		{DownloadMbps: 300, UploadMbps: 150, CreatedAt: now.Add(-2 * time.Hour)},
 		// Older than the window, so it must not affect the aggregates.
-		{DownloadMbps: 9000, UploadMbps: 9000, PingMs: 1, CreatedAt: now.Add(-90 * 24 * time.Hour)},
+		{DownloadMbps: 9000, UploadMbps: 9000, CreatedAt: now.Add(-90 * 24 * time.Hour)},
 	}
 	for i := range rows {
 		if err := db.Save(ctx, &rows[i]); err != nil {
@@ -138,28 +137,6 @@ func TestSummarize(t *testing.T) {
 	}
 	if sum.MaxDownloadMbps != 300 {
 		t.Errorf("MaxDownloadMbps = %v, want 300", sum.MaxDownloadMbps)
-	}
-	if sum.MinPingMs != 4 {
-		t.Errorf("MinPingMs = %v, want 4", sum.MinPingMs)
-	}
-}
-
-// A ping of exactly zero means "not measured", so it must not win MIN().
-func TestSummarizeIgnoresZeroPing(t *testing.T) {
-	ctx := context.Background()
-	db := open(t)
-	for _, r := range []Result{{PingMs: 0}, {PingMs: 12}} {
-		row := r
-		if err := db.Save(ctx, &row); err != nil {
-			t.Fatal(err)
-		}
-	}
-	sum, err := db.Summarize(ctx, time.Now().Add(-time.Hour))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sum.MinPingMs != 12 {
-		t.Errorf("MinPingMs = %v, want 12", sum.MinPingMs)
 	}
 }
 

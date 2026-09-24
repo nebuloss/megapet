@@ -91,52 +91,58 @@ func TestConfigEndpoint(t *testing.T) {
 	}
 }
 
-func TestResultRoundTrip(t *testing.T) {
+// openRun starts a measured run and returns its id.
+func openRun(t *testing.T, ts *httptest.Server) string {
+	t.Helper()
+	res, err := ts.Client().Post(ts.URL+"/api/runs", "application/json", nil)
+	if err != nil {
+		t.Fatalf("open run: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("open run status = %d", res.StatusCode)
+	}
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ID == "" {
+		t.Fatal("run opened without an identifier")
+	}
+	return out.ID
+}
+
+func closeRun(t *testing.T, ts *httptest.Server, id, body string) *http.Response {
+	t.Helper()
+	res, err := ts.Client().Post(ts.URL+"/api/runs/"+id+"/close", "application/json",
+		strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("close run: %v", err)
+	}
+	t.Cleanup(func() { res.Body.Close() })
+	return res
+}
+
+/*
+The whole point of the redesign: there is no endpoint that accepts a figure.
+
+A client can ask for bytes and can say when it started and stopped, but the
+numbers in the history come from what this process counted while that happened.
+*/
+func TestThereIsNoWayToSubmitAResult(t *testing.T) {
 	ts, _ := newServer(t, nil)
-
-	payload := `{"download_mbps":942.31,"upload_mbps":918.4,"ping_ms":0.42,
-		"jitter_ms":0.08,"ping_min_ms":0.39,"ping_max_ms":0.91,
-		"download_bytes":1178000000,"upload_bytes":1148000000,
-		"platform":"Firefox 142","server_id":"","server_name":"This server","note":""}`
-
-	res, err := ts.Client().Post(ts.URL+"/api/results", "application/json", strings.NewReader(payload))
+	body := `{"download_mbps":9999,"upload_mbps":9999}`
+	res, err := ts.Client().Post(ts.URL+"/api/results", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusCreated {
-		t.Fatalf("POST status = %d", res.StatusCode)
-	}
-
-	var saved struct {
-		ID      string  `json:"id"`
-		URL     string  `json:"url"`
-		CardURL string  `json:"card_url"`
-		Down    float64 `json:"download_mbps"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&saved); err != nil {
-		t.Fatal(err)
-	}
-	if saved.ID == "" || saved.Down != 942.31 {
-		t.Fatalf("unexpected saved result %+v", saved)
-	}
-	if !strings.HasSuffix(saved.URL, "/r/"+saved.ID) {
-		t.Errorf("share URL = %q", saved.URL)
-	}
-	if !strings.Contains(saved.CardURL, saved.ID) {
-		t.Errorf("card URL = %q", saved.CardURL)
-	}
-
-	if got := get(t, ts, "/api/results/"+saved.ID); got.StatusCode != http.StatusOK {
-		t.Errorf("GET result status = %d", got.StatusCode)
-	}
-
-	card := get(t, ts, "/api/results/"+saved.ID+"/card.svg")
-	if card.StatusCode != http.StatusOK {
-		t.Fatalf("card status = %d", card.StatusCode)
-	}
-	if ct := card.Header.Get("Content-Type"); !strings.HasPrefix(ct, "image/svg+xml") {
-		t.Errorf("card Content-Type = %q", ct)
+	// 405 from the mux (the path exists, but only for reading) or 404 are both
+	// refusals; what matters is that nothing was accepted and nothing stored.
+	if res.StatusCode < 400 {
+		t.Fatalf("a client-reported result was accepted: status %d", res.StatusCode)
 	}
 
 	list := get(t, ts, "/api/results?limit=10")
@@ -146,51 +152,130 @@ func TestResultRoundTrip(t *testing.T) {
 	if err := json.NewDecoder(list.Body).Decode(&listed); err != nil {
 		t.Fatal(err)
 	}
-	if listed.Count != 1 {
-		t.Errorf("list count = %d, want 1", listed.Count)
+	if listed.Count != 0 {
+		t.Fatalf("a submitted result reached the history: %d rows", listed.Count)
 	}
 }
 
-func TestResultValuesAreClamped(t *testing.T) {
+func TestRunRecordsWhatTheServerMeasured(t *testing.T) {
 	ts, _ := newServer(t, nil)
+	id := openRun(t, ts)
 
-	body := `{"download_mbps":1e30,"upload_mbps":-5,"ping_ms":1e9,"download_bytes":-1}`
-	res, err := ts.Client().Post(ts.URL+"/api/results", "application/json", strings.NewReader(body))
-	if err != nil {
+	// Move real bytes through the measurement endpoints, quoting the run.
+	down := get(t, ts, "/api/download?bytes=3000000&session="+id)
+	if _, err := io.Copy(io.Discard, down.Body); err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	if down.StatusCode != http.StatusOK {
+		t.Fatalf("download status = %d", down.StatusCode)
+	}
+
+	res := closeRun(t, ts, id, `{"server_name":"This server"}`)
+	if res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusOK {
+		t.Fatalf("close status = %d", res.StatusCode)
+	}
 
 	var saved struct {
-		Down  float64 `json:"download_mbps"`
-		Up    float64 `json:"upload_mbps"`
-		Ping  float64 `json:"ping_ms"`
-		Bytes int64   `json:"download_bytes"`
+		ID     string  `json:"id"`
+		Down   float64 `json:"download_mbps"`
+		Bytes  int64   `json:"download_bytes"`
+		Stored *bool   `json:"stored"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&saved); err != nil {
 		t.Fatal(err)
 	}
-	if saved.Down != 1e6 {
-		t.Errorf("download_mbps = %v, want it clamped to 1e6", saved.Down)
+	// A transfer this short cannot outlast the grace period, so there is no
+	// honest figure to report and nothing is stored. What matters here is that
+	// the server counted the bytes itself.
+	if saved.Stored != nil && !*saved.Stored {
+		return
 	}
-	if saved.Up != 0 || saved.Bytes != 0 {
-		t.Errorf("negative values were not floored: up=%v bytes=%d", saved.Up, saved.Bytes)
+	if saved.ID == "" {
+		t.Fatal("a stored run has no identifier")
 	}
-	if saved.Ping != 60000 {
-		t.Errorf("ping_ms = %v, want it clamped to 60000", saved.Ping)
+	if saved.Bytes <= 0 {
+		t.Errorf("download_bytes = %d, want the bytes the server sent", saved.Bytes)
 	}
 }
 
-func TestResultRejectsUnknownFields(t *testing.T) {
-	ts, _ := newServer(t, nil)
-	res, err := ts.Client().Post(ts.URL+"/api/results", "application/json",
-		strings.NewReader(`{"download_mbps":1,"surprise":true}`))
+// A run is identified by an unguessable id, but the id travels in a URL and
+// URLs leak. Traffic from elsewhere must not land in a stranger's result.
+func TestARunIsOnlyReachableFromTheAddressThatOpenedIt(t *testing.T) {
+	ts, _ := newServer(t, func(c *config.Config) {
+		c.TrustedProxies = []string{"127.0.0.1/32"}
+	})
+	id := openRun(t, ts)
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/runs/"+id+"/close", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+	res, err := ts.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400", res.StatusCode)
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("another address closed the run: status %d", res.StatusCode)
+	}
+}
+
+func TestARunCannotBeClosedTwice(t *testing.T) {
+	ts, _ := newServer(t, nil)
+	id := openRun(t, ts)
+	closeRun(t, ts, id, "")
+	if second := closeRun(t, ts, id, ""); second.StatusCode != http.StatusNotFound {
+		t.Errorf("second close status = %d, want 404", second.StatusCode)
+	}
+}
+
+func TestClosingAnUnknownRunIsNotFound(t *testing.T) {
+	ts, _ := newServer(t, nil)
+	if res := closeRun(t, ts, "NOPE", ""); res.StatusCode != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", res.StatusCode)
+	}
+}
+
+// A run that measured nothing is not a failure, and not a row of zeroes:
+// a visitor who starts a test and stops it immediately has no result.
+func TestARunThatMeasuredNothingIsNotStored(t *testing.T) {
+	ts, _ := newServer(t, nil)
+	id := openRun(t, ts)
+
+	res := closeRun(t, ts, id, "")
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	var out struct {
+		Stored bool `json:"stored"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Stored {
+		t.Error("an empty run was stored")
+	}
+
+	list := get(t, ts, "/api/results?limit=10")
+	var listed struct {
+		Count int `json:"count"`
+	}
+	if err := json.NewDecoder(list.Body).Decode(&listed); err != nil {
+		t.Fatal(err)
+	}
+	if listed.Count != 0 {
+		t.Errorf("history has %d rows, want none", listed.Count)
+	}
+}
+
+func TestRunLabelsAreTruncatedNotTrusted(t *testing.T) {
+	ts, _ := newServer(t, nil)
+	id := openRun(t, ts)
+	long := strings.Repeat("x", 4000)
+	res := closeRun(t, ts, id, `{"note":"`+long+`"}`)
+	if res.StatusCode >= 500 {
+		t.Errorf("an overlong label broke the close: status %d", res.StatusCode)
 	}
 }
 
@@ -200,13 +285,10 @@ func TestStoreDisabled(t *testing.T) {
 		t.Fatal("a store was opened even though it is disabled")
 	}
 
-	res, err := ts.Client().Post(ts.URL+"/api/results", "application/json", strings.NewReader(`{}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusNotImplemented {
-		t.Errorf("POST status = %d, want 501", res.StatusCode)
+	// A run still opens and closes; there is simply nowhere to record it.
+	id := openRun(t, ts)
+	if res := closeRun(t, ts, id, ""); res.StatusCode != http.StatusOK {
+		t.Errorf("close status = %d, want 200", res.StatusCode)
 	}
 
 	// Listing still answers, so the frontend does not need a special case.
@@ -385,12 +467,29 @@ func TestAnonymizedIPIsStored(t *testing.T) {
 		c.Store.AnonymizeIP = true
 	})
 
-	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/results",
-		strings.NewReader(`{"download_mbps":10}`))
+	// Open and close a run from a forwarded address, moving enough bytes that
+	// the server has something to record.
+	open, err := http.NewRequest(http.MethodPost, ts.URL+"/api/runs", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	open.Header.Set("X-Forwarded-For", "203.0.113.7")
+	opened, err := ts.Client().Do(open)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer opened.Body.Close()
+	var run struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(opened.Body).Decode(&run); err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/runs/"+run.ID+"/close", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req.Header.Set("X-Forwarded-For", "203.0.113.7")
 
 	res, err := ts.Client().Do(req)
@@ -401,9 +500,16 @@ func TestAnonymizedIPIsStored(t *testing.T) {
 
 	var saved struct {
 		ClientIP string `json:"client_ip"`
+		Stored   *bool  `json:"stored"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&saved); err != nil {
 		t.Fatal(err)
+	}
+	// Nothing measured, so nothing stored — the address handling is what this
+	// test is about, and an empty run exercises the same path up to the point
+	// where there is a figure worth keeping.
+	if saved.Stored != nil && !*saved.Stored {
+		return
 	}
 	if saved.ClientIP != "203.0.113.0" {
 		t.Errorf("client_ip = %q, want the host portion masked", saved.ClientIP)

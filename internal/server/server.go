@@ -12,6 +12,7 @@ import (
 	"github.com/nebuloss/megapet/internal/ipinfo"
 	"github.com/nebuloss/megapet/internal/metrics"
 	"github.com/nebuloss/megapet/internal/netutil"
+	"github.com/nebuloss/megapet/internal/session"
 	"github.com/nebuloss/megapet/internal/speed"
 	"github.com/nebuloss/megapet/internal/store"
 )
@@ -29,6 +30,9 @@ type Server struct {
 	limiter  *speed.Limiter
 	resolver *netutil.Resolver
 	metrics  *metrics.Registry
+	// runs holds the tests currently being measured, so the bytes moving
+	// through the measurement endpoints can be attributed to one of them.
+	runs *session.Store
 }
 
 // New assembles a Server. db may be nil.
@@ -42,6 +46,10 @@ func New(cfg config.Config, log *slog.Logger, db *store.DB, reg *metrics.Registr
 	if err != nil {
 		return nil, err
 	}
+	// One run needs far fewer slots than it does streams, but the bound has to
+	// exist: a run is opened by an unauthenticated request.
+	runs := session.NewStore(cfg.Limits.MaxStreamsTotal, 5*time.Minute)
+	sh.Sessions = runs
 	sh.OnDownloadBytes = func(n int64) { reg.DownloadBytes.Add(n) }
 	sh.OnUploadBytes = func(n int64) { reg.UploadBytes.Add(n) }
 	sh.OnPing = func() { reg.PingRequests.Add(1) }
@@ -59,7 +67,7 @@ func New(cfg config.Config, log *slog.Logger, db *store.DB, reg *metrics.Registr
 
 	return &Server{
 		cfg: cfg, log: log, db: db, ip: lookup,
-		speed: sh, limiter: limiter, resolver: resolver, metrics: reg,
+		speed: sh, limiter: limiter, resolver: resolver, metrics: reg, runs: runs,
 	}, nil
 }
 
@@ -80,7 +88,10 @@ func (s *Server) Handler() http.Handler {
 	// Metadata and results.
 	mux.HandleFunc("GET /api/config", s.handleConfig)
 	mux.HandleFunc("GET /api/ip", s.handleIP)
-	mux.HandleFunc("POST /api/results", s.handleSaveResult)
+	// Opening and closing a run. Note there is no endpoint that accepts a
+	// measurement: figures come from what this server counted.
+	mux.HandleFunc("POST /api/runs", s.handleOpenRun)
+	mux.HandleFunc("POST /api/runs/{id}/close", s.handleCloseRun)
 	mux.HandleFunc("GET /api/results", s.handleListResults)
 	mux.HandleFunc("GET /api/results/{id}", s.handleGetResult)
 	mux.HandleFunc("GET /api/results/{id}/card.svg", s.handleResultCard)

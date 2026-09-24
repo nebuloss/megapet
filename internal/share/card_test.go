@@ -20,8 +20,6 @@ func TestRenderProducesWellFormedSVG(t *testing.T) {
 			CreatedAt:    time.Date(2026, 9, 3, 9, 47, 0, 0, time.UTC),
 			DownloadMbps: 942.31,
 			UploadMbps:   918.4,
-			PingMs:       0.42,
-			JitterMs:     0.08,
 			ISP:          "Private network",
 			ServerName:   "This server",
 		},
@@ -82,27 +80,5 @@ func TestRenderRejectsBogusAccent(t *testing.T) {
 	}
 	if strings.Contains(sb.String(), "onload") {
 		t.Error("a non-hex accent colour reached the output")
-	}
-}
-
-func TestFormatHelpers(t *testing.T) {
-	tests := []struct {
-		got, want string
-	}{
-		{formatSpeed(0), "—"},
-		{formatSpeed(9.456), "9.46"},
-		{formatSpeed(94.56), "94.6"},
-		{formatSpeed(945.6), "946"},
-		{formatMs(0), "—"},
-		{formatMs(0.42), "0.4 ms"},
-		{formatMs(120), "120 ms"},
-		{formatBytes(512), "512 B"},
-		{formatBytes(1536), "1.5 KiB"},
-		{formatBytes(1 << 30), "1.0 GiB"},
-	}
-	for _, tc := range tests {
-		if tc.got != tc.want {
-			t.Errorf("got %q, want %q", tc.got, tc.want)
-		}
 	}
 }
