@@ -7,6 +7,7 @@ import type { ThemeController } from '../theme';
 import { Snackbar, confirm } from './components';
 import {
   DIRECT_PEER_ID,
+  GraphModal,
   Hero,
   ModeTabs,
   type Mode,
@@ -53,7 +54,7 @@ export class App {
   private readonly modes: ModeTabs;
   /** The mode whose controls the main page shows, graph page included. */
   private mode: Mode = 'auto';
-  private onGraph = false;
+  private readonly graph: GraphModal;
 
   private peer: Peer | null;
   /** Configured backends, plus the server's own address when it is usable. */
@@ -82,7 +83,7 @@ export class App {
         void this.refreshConnection();
       },
       onVisualChange: (kind) => this.hero.setVisual(kind),
-      onGraph: () => this.router.navigate(this.onGraph ? this.pathFor(this.mode) : '/graph'),
+      onGraph: () => this.toggleGraph(),
       currentPeer: () => this.peer,
       currentVisual: () => this.hero.visualKind,
     });
@@ -112,6 +113,8 @@ export class App {
       onSample: () => this.monitor.refresh(),
       onLive: (down, up) => this.monitor.setExternalLive(down, up),
     });
+
+    this.graph = new GraphModal({ onClose: () => this.toggleGraph() });
 
     this.modes = new ModeTabs({
       onSelect: (mode) => void this.chooseMode(mode),
@@ -159,13 +162,13 @@ export class App {
         this.main,
         this.buildFooter(),
       ),
+      this.graph.root,
       this.liveRegion,
     );
 
     this.router
       .add('/r/:id', ({ id }) => this.showResult(id ?? ''))
       .add('/manual', () => this.showHome('manual'))
-      .add('/graph', () => this.showHome(this.mode, true))
       .fallback(() => this.showHome())
       .start();
 
@@ -179,6 +182,7 @@ export class App {
     this.hero.destroy();
     this.resultView?.destroy();
     this.monitor.destroy();
+    this.graph.destroy();
     this.snackbar.destroy();
   }
 
@@ -192,45 +196,72 @@ export class App {
    * same tiles, same history. That is the whole difference, and keeping it
    * that small is what stops the two views disagreeing about what is running.
    */
-  private showHome(mode: Mode = 'auto', graph = false): void {
-    this.onGraph = graph;
+  private showHome(mode: Mode = 'auto'): void {
     this.mode = mode;
     this.resultView?.destroy();
     this.resultView = null;
 
     // The hero takes the first column and everything else stacks in the
     // second, so a wide screen is not a narrow strip down the middle.
-    this.main.dataset.layout = graph ? 'graph' : 'split';
+    this.main.dataset.layout = 'split';
     this.main.replaceChildren(
       this.hero.root,
-      ...(graph
-        ? []
-        : [el('div', { class: 'page-stack' }, this.stats.root, this.shareSlot, this.history.root)]),
+      el('div', { class: 'page-stack' }, this.stats.root, this.shareSlot, this.history.root),
     );
 
     this.modes.setMode(mode);
-    this.topBar.setGraphActive(graph);
     this.modes.root.hidden = false;
 
-    // The panel stands in for the dial whenever it has something to show:
-    // manual's controls, the graph, or both.
+    // Manual mode takes the dial's place: they are two ways of doing the same
+    // thing, not two things to do. The graph is neither, and lives over the
+    // page in a dialog.
     this.monitor.setMode(mode);
-    if (graph || mode === 'manual') {
-      this.monitor.setTitle(graph ? 'Graph' : 'Manual mode');
+    if (mode === 'manual' && !this.graph.isOpen) {
+      this.monitor.setTitle('Manual mode');
       this.monitor.setCompact(true);
-      this.monitor.setShowGraph(graph);
+      this.monitor.setShowGraph(false);
       this.hero.setManual(this.monitor.root);
-    } else {
+    } else if (!this.graph.isOpen) {
       this.hero.setManual(null);
     }
-        if (this.config.show_history) void this.history.refresh();
+
+    if (this.config.show_history) void this.history.refresh();
     else this.history.clear();
 
     if (this.config.auto_start && !this.tests.isRunning) void this.tests.run(this.peer);
   }
 
+  /**
+   * Opens or closes the graph over the page.
+   *
+   * The panel is moved into the dialog and back out again rather than rebuilt,
+   * because that panel is the session: a new one would be drawing nothing.
+   */
+  private toggleGraph(): void {
+    if (this.graph.isOpen) {
+      const panel = this.graph.hide();
+      this.topBar.setGraphActive(false);
+      // Back where it belongs, which depends on the mode it returns to.
+      if (panel && this.mode === 'manual') {
+        this.monitor.setTitle('Manual mode');
+        this.monitor.setShowGraph(false);
+        this.hero.setManual(panel);
+      } else {
+        this.hero.setManual(null);
+      }
+      return;
+    }
+
+    this.monitor.setTitle('Graph');
+    this.monitor.setShowGraph(true);
+    this.monitor.setCompact(false);
+    this.hero.setManual(null);
+    this.graph.show(this.monitor.root);
+    this.topBar.setGraphActive(true);
+    this.monitor.refresh();
+  }
+
   private showResult(id: string): void {
-    this.onGraph = false;
     // A saved result is neither mode, so the switch has nothing to say here.
     this.modes.root.hidden = true;
     this.topBar.setGraphActive(false);
@@ -255,8 +286,7 @@ export class App {
     // and leaves you looking at the graph. Being thrown back to the controls
     // every time you touched the mode tabs made the graph feel like somewhere
     // you were only ever passing through.
-    // On the graph the view stays put; only which mode it belongs to changes.
-    const path = this.onGraph ? '/graph' : this.pathFor(mode);
+    const path = this.pathFor(mode);
     const running = this.runningMode();
     if (running === null || running === mode) {
       this.commitMode(mode, path);
@@ -303,7 +333,9 @@ export class App {
   private applyMode(mode: Mode): void {
     this.mode = mode;
     this.modes.setMode(mode);
-    if (this.onGraph) {
+    // With the graph open the panel is in the dialog; it still has to be told
+    // which mode's controls it is presenting.
+    if (this.graph.isOpen) {
       this.monitor.setMode(mode);
       this.monitor.refresh();
     }

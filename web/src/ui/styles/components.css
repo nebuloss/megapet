@@ -2039,3 +2039,121 @@
   color: var(--md-sys-color-on-error);
 }
 
+/* ------------------------------------------------------------ graph modal */
+
+.graph-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.5rem, 3vw, 2rem);
+  background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 60%, transparent);
+}
+
+.graph-modal[hidden] {
+  display: none;
+}
+
+/*
+ * Sized to the viewport, not to its contents.
+ *
+ * The graph is read along its time axis, so it takes the width; capping the
+ * height is what stops the readouts below it pushing the whole thing off the
+ * bottom, which is exactly what made this unusable as a page.
+ */
+.graph-modal__panel {
+  position: relative;
+  width: min(72rem, 100%);
+  max-height: min(46rem, 92dvh);
+  overflow: auto;
+  padding: 1.25rem;
+  border-radius: var(--md-sys-shape-corner-xl);
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: 0 12px 48px rgb(0 0 0 / 45%);
+}
+
+.graph-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+}
+
+/*
+ * The top bar stays reachable over the scrim.
+ *
+ * Its graph button is a toggle, so covering it means the control that opened
+ * the dialog cannot close it — you press it, nothing happens, and the only way
+ * out is a button somewhere else. The bar is a thin strip and the dialog is
+ * centred, so nothing of the graph is lost to it.
+ */
+body[data-modal='open'] .top-bar {
+  /* `sticky` inside the scrolled shell cannot outrank a fixed overlay, so it
+     is taken out of flow for as long as the dialog is up. */
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 80;
+}
+
+/*
+ * The scrim stops below the top bar rather than covering it.
+ *
+ * Relying on paint order alone would leave the bar's own controls sitting
+ * under a transparent layer: they would still receive clicks, but only
+ * because the bar happens to be painted later, which is a fragile thing to
+ * depend on. Insetting the scrim means the two never overlap, so the button
+ * that opened the dialog can always close it.
+ *
+ * The height is the bar's `min-height` plus the safe-area padding it takes on
+ * a notched phone, so the two stay flush without either being measured.
+ */
+.graph-modal {
+  top: calc(4rem + max(0px, env(safe-area-inset-top)));
+}
+
+/*
+ * The mode tabs stay usable too.
+ *
+ * The graph shows whichever mode is selected, so switching mode while it is
+ * open is a reasonable thing to do — and the tabs sit just below the bar,
+ * squarely under the scrim. Lifting them is enough; they are a thin strip and
+ * the dialog is centred well below.
+ */
+body[data-modal='open'] .modes {
+  position: relative;
+  z-index: 80;
+}
+
+/* Inside the dialog the panel is the dialog's content, not a card of its own:
+   the surface is already provided, and a second one reads as a box in a box. */
+.graph-modal__body .monitor {
+  background: transparent;
+  padding: 0;
+}
+
+/* The mascot has no room to spare here, and the graph is the thing to watch. */
+.graph-modal__body .monitor__rider {
+  display: none;
+}
+
+.graph-modal__body .monitor__chart {
+  height: clamp(12rem, 38dvh, 20rem);
+}
+
+/* Readouts go side by side rather than stacking into a column that has to be
+   scrolled past, which was the specific complaint about the page version. */
+.graph-modal__body .monitor__readouts {
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+}
+
+@media (max-width: 40rem) {
+  .graph-modal__panel {
+    max-height: 94dvh;
+    padding: 1rem;
+  }
+
+  .graph-modal__body .monitor__readouts {
+    grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+  }
+}

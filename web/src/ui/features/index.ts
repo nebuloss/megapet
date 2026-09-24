@@ -7,4 +7,5 @@ export * from './share-panel';
 export * from './test-controller';
 export * from './direct-endpoint';
 export * from './monitor-panel';
+export * from './graph-modal';
 export * from './mode-tabs';

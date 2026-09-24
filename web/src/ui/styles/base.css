@@ -102,16 +102,6 @@ main {
   main[data-layout='single'] {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  /*
-   * The graph gets the page to itself. It is read along its time axis, so
-   * width is the whole point; squeezed into the dial's column it was a plot
-   * about four inches across, and even given the larger of two columns it was
-   * still competing with tiles nobody was looking at while watching a graph.
-   */
-  main[data-layout='graph'] {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Everything that sits in the second column. */
@@ -131,4 +121,10 @@ main {
 
 .page-footer a {
   color: inherit;
+}
+
+/* The page behind a modal must not scroll, or dismissing it leaves you
+   somewhere you never chose to be. */
+body[data-modal='open'] {
+  overflow: hidden;
 }

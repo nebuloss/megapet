@@ -147,11 +147,16 @@ There is a second shape of test: **manual mode** (`engine/monitor.ts` +
 (`ui/features/mode-tabs.ts`) chooses between **Auto**, the staged run, and
 **Manual**, the open-ended one, and the two are alternatives in the same place
 — manual mode's controls replace the speed dial in the hero rather than
-sitting below it. Routes: `/` auto, `/manual` manual controls, `/graph` the graph. All three are
-**the same page**: the graph is a *view*, not a screen. Switching to it swaps
-the picture in the middle — the dial or manual's controls become the plot —
-and gives it the full page width, since a time axis is read along its length.
-The mode tabs and the primary button stay exactly where they were. Keeping the difference that small is what stops the
+sitting below it. Routes: `/` auto, `/manual` manual controls. **The graph is a dialog, not a
+route** (`ui/features/graph-modal.ts`): it opens over the page, which is left
+exactly as it was underneath. It was a view of the page once, and everything
+else had to get out of its way — tiles and history removed, columns
+rearranged, the result tall enough to need scrolling past controls that had
+not moved.
+
+The dialog holds no content of its own: `MonitorPanel` is *moved* into it and
+back out. That panel is the session, so rebuilding it there would throw away
+the run it is drawing. Keeping the difference that small is what stops the
 two views disagreeing about what is running, which is how the graph once ended
 up offering manual's controls while auto mode was selected.
 
@@ -273,6 +278,11 @@ Non-obvious frontend invariants:
   threw used to leave the handle set with nothing scheduled, so the loop was
   dead and could never restart: the graph froze while the readouts beside it
   carried on.
+- **The top bar and mode tabs stay above the scrim.** The bar's graph button
+  is a toggle, so covering it leaves the control that opened the dialog unable
+  to close it; the tabs matter because the graph shows whichever mode is
+  selected. The scrim also stops below the bar rather than relying on paint
+  order.
 - **The monitor panel outlives its page.** It is built once in `App` and
   re-parented when shown, so a session keeps running while you look at the
   speed test and the graph is still growing when you come back. Nothing on
